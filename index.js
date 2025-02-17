@@ -4278,46 +4278,48 @@ async function processTTSQueue(guildId) {
   let player = null;
 
   try {
-    // 기존 연결 정리
-    const existingConnection = getVoiceConnection(guildId);
-    if (existingConnection) {
-      existingConnection.destroy();
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
-    // 새로운 연결 시도
-    connection = joinVoiceChannel({
-      channelId: item.voiceChannel.id,
-      guildId: guildId,
-      adapterCreator: item.voiceChannel.guild.voiceAdapterCreator,
-      selfDeaf: false,
-      selfMute: false
-    });
-
-    // 연결 준비 대기
-    try {
-      await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
-    } catch (error) {
-      if (connection) connection.destroy();
-      throw new Error('음성 채널 연결 실패');
-    }
-
-    // 연결 상태 모니터링
-    connection.on('stateChange', (oldState, newState) => {
-      if (newState.status === VoiceConnectionStatus.Disconnected) {
+    // 기존 연결 확인 또는 새로운 연결 생성
+    connection = getVoiceConnection(guildId);
+    if (!connection || connection.state.status !== 'ready' || connection.joinConfig.channelId !== item.voiceChannel.id) {
+      // 기존 연결이 있으면 제거
+      if (connection) {
         connection.destroy();
-        queue.isProcessing = false;
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-    });
 
-    // TTS 생성
+      // 새로운 연결 생성
+      connection = joinVoiceChannel({
+        channelId: item.voiceChannel.id,
+        guildId: guildId,
+        adapterCreator: item.voiceChannel.guild.voiceAdapterCreator,
+        selfDeaf: false,
+        selfMute: false
+      });
+
+      // 연결 준비 대기
+      try {
+        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+      } catch (error) {
+        if (connection) connection.destroy();
+        throw new Error('음성 채널 연결 실패');
+      }
+
+      // 연결 상태 모니터링
+      connection.on('stateChange', (oldState, newState) => {
+        if (newState.status === VoiceConnectionStatus.Disconnected) {
+          queue.isProcessing = false;
+          connection.destroy();
+        }
+      });
+    }
+
+    // TTS 생성 및 재생
     const tempFile = path.join(TEMP_DIR, `tts_${Date.now()}.mp3`);
     const url = `http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=${encodeURIComponent(item.text)}&tl=${item.language}`;
     
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     fs.writeFileSync(tempFile, response.data);
 
-    // 플레이어 생성 및 재생
     player = createAudioPlayer({
       behaviors: {
         noSubscriber: NoSubscriberBehavior.Play
@@ -4358,19 +4360,17 @@ async function processTTSQueue(guildId) {
       }
     });
 
-    // 재생 완료 후 정리
-    if (connection) connection.destroy();
+    // 현재 메시지 처리 완료
     queue.items.shift();
     queue.isProcessing = false;
 
-    // 다음 메시지 처리
+    // 다음 메시지가 있으면 처리
     if (queue.items.length > 0) {
       setTimeout(() => processTTSQueue(guildId), 1000);
     }
 
   } catch (error) {
     console.error('TTS 처리 중 오류:', error);
-    if (connection) connection.destroy();
     queue.items.shift();
     queue.isProcessing = false;
     
