@@ -466,17 +466,24 @@ client.on('messageCreate', async (message) => {
     try {
       const loadingMsg = await message.reply('🔍 계정을 확인중입니다...');
       
-      // 발로란트 API 호출 부분 수정
-      const response = await axios.get(`https://api.henrikdev.xyz/valorant/v1/mmr/ap/${name}/${tag}`, {
-        headers: {
-          'Authorization': process.env.VALORANT_API_KEY
+      // 계정 정보 가져오기 (v1 API 사용)
+      const accountResponse = await axios.get(
+        `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
+        {
+          headers: {
+            'Authorization': process.env.VALORANT_API_KEY
+          }
         }
-      });
+      );
 
-      const accountData = response.data.data;
+      if (accountResponse.data.status !== 200) {
+        throw new Error('Account not found');
+      }
+
+      const accountData = accountResponse.data.data;
       const region = accountData.region.toLowerCase();
 
-      // MMR 정보 가져오기
+      // MMR 정보 가져오기 (v2 API 사용)
       const mmrResponse = await axios.get(
         `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
         {
@@ -489,35 +496,18 @@ client.on('messageCreate', async (message) => {
       const mmrData = mmrResponse.data.data;
       const currentTier = mmrData.current_data.currenttierpatched.split(' ')[0];
 
-      // 매치 기록 가져오기
-      const matchesResponse = await axios.get(
-        `https://api.henrikdev.xyz/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
-        {
-          headers: {
-            'Authorization': process.env.VALORANT_API_KEY
-          }
-        }
-      );
-
-      const matchesData = matchesResponse.data.data;
-      const lastMatch = matchesData[0];
-
       // 계정 정보 저장
       const discordId = message.author.id;
-      const newSettings = {
-        ...valorantSettings,  // 기존 데이터 유지
-        [discordId]: {       // 새 데이터 추가
-          discordTag: message.author.tag,
-          valorantName: name,
-          valorantTag: tag,
-          region: region,
-          puuid: accountData.puuid,
-          updatedAt: new Date().toISOString()
-        }
+      valorantSettings[discordId] = {
+        discordTag: message.author.tag,
+        valorantName: name,
+        valorantTag: tag,
+        region: region,
+        puuid: accountData.puuid,
+        updatedAt: new Date().toISOString()
       };
       
-      valorantSettings = newSettings;  // 전체 객체 업데이트
-      saveValorantSettings();         // 저장
+      saveValorantSettings();
 
       // 티어 역할 업데이트 시도
       try {
@@ -526,68 +516,47 @@ client.on('messageCreate', async (message) => {
         console.error('역할 업데이트 실패:', roleError);
       }
 
-      // 임베드 생성
-      const tierColors = {
-        'Iron': 0x7C7C7C,
-        'Bronze': 0xA0522D,
-        'Silver': 0xC0C0C0,
-        'Gold': 0xFFD700,
-        'Platinum': 0x00FFFF,
-        'Diamond': 0xFF69B4,
-        'Ascendant': 0x00FF00,
-        'Immortal': 0xFF0000,
-        'Radiant': 0xFFFF00
-      };
-
-      const embedColor = tierColors[currentTier] || 0xFF4654;
-
       const embed = {
-        color: embedColor,
-        title: `${name}#${tag}님의 발로란트 전적 [계정 등록됨]`,
+        color: 0xFF4654,
+        title: `✅ 발로란트 계정 등록 완료`,
         thumbnail: {
-          url: accountData.card.small
+          url: accountData.card?.small || 'https://i.imgur.com/G53MXS3.png'
         },
+        description: `${message.author}님의 발로란트 계정이 등록되었습니다.`,
         fields: [
+          {
+            name: '디스코드 계정',
+            value: message.author.tag,
+            inline: true
+          },
+          {
+            name: '발로란트 계정',
+            value: `${name}#${tag}`,
+            inline: true
+          },
           {
             name: '🎮 계정 정보',
             value: `레벨: ${accountData.account_level}\n지역: ${accountData.region}`,
             inline: true
-          },
-          {
-            name: '🏆 현재 티어',
-            value: mmrData.current_data.currenttierpatched,
-            inline: true
-          },
-          {
-            name: '📊 최근 경기',
-            value: `${lastMatch.metadata.map}\n${lastMatch.metadata.mode}\n${lastMatch.metadata.result}`,
-            inline: true
           }
         ],
         footer: {
-          text: '이제부터 ㅂ발로 명령어만 입력하면 자동으로 이 계정이 검색됩니다.'
+          text: '이제 ㅂ발로 명령어만 입력해도 자동으로 이 계정이 검색됩니다.'
         },
         timestamp: new Date()
       };
 
       await loadingMsg.edit({ content: null, embeds: [embed] });
 
-      console.log(`새 계정 등록됨: ${message.author.tag} (${name}#${tag})`);
-
     } catch (error) {
-      console.error('상세 에러 정보:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url
-      });
+      console.error('상세 에러 정보:', error);
       
-      if (error.response?.status === 404) {
+      if (error.response?.status === 404 || error.message === 'Account not found') {
         message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
       } else if (error.response?.status === 429) {
         message.reply('❌ 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
       } else {
-        message.reply('❌ 전적 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.');
+        message.reply('❌ 계정 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.');
       }
     }
   }
@@ -711,213 +680,213 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // "ㅂ검색" 명령어 처리 부분 수정
-  else if (content.startsWith('ㅂ검색') || content.startsWith('ㅂㄱㅅ') || content.startsWith('ㅂㄳ')) {
-    const query = content.slice(3).trim();
-    if (!query) {
-      return message.reply('사용법: ㅂ검색 [검색어]');
-    }
+  // // "ㅂ검색" 명령어 처리 부분 수정
+  // else if (content.startsWith('ㅂ검색') || content.startsWith('ㅂㄱㅅ') || content.startsWith('ㅂㄳ')) {
+  //   const query = content.slice(3).trim();
+  //   if (!query) {
+  //     return message.reply('사용법: ㅂ검색 [검색어]');
+  //   }
 
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) {
-      return message.reply('음성 채널에 먼저 입장해주세요!');
-    }
+  //   const voiceChannel = message.member.voice.channel;
+  //   if (!voiceChannel) {
+  //     return message.reply('음성 채널에 먼저 입장해주세요!');
+  //   }
 
-    try {
-      const loadingMsg = await message.reply('🔍 검색중...');
+  //   try {
+  //     const loadingMsg = await message.reply('🔍 검색중...');
       
-      const searchResults = await play.search(query, {
-        limit: 5,
-        source: { youtube: "video" }
-      });
+  //     const searchResults = await play.search(query, {
+  //       limit: 5,
+  //       source: { youtube: "video" }
+  //     });
 
-      if (!searchResults?.length) {
-        return loadingMsg.edit('❌ 검색 결과가 없습니다.');
-      }
+  //     if (!searchResults?.length) {
+  //       return loadingMsg.edit('❌ 검색 결과가 없습니다.');
+  //     }
 
-      const embed = {
-        color: 0x0099ff,
-        title: '🎵 검색 결과',
-        description: searchResults.map((video, index) => 
-          `${index + 1}. **${video.title}**\n└ 길이: ${video.durationRaw}`
-        ).join('\n\n'),
-        footer: {
-          text: '30초 안에 번호를 입력하세요 (1-5) | 취소하려면 "취소" 입력'
-        }
-      };
+  //     const embed = {
+  //       color: 0x0099ff,
+  //       title: '🎵 검색 결과',
+  //       description: searchResults.map((video, index) => 
+  //         `${index + 1}. **${video.title}**\n└ 길이: ${video.durationRaw}`
+  //       ).join('\n\n'),
+  //       footer: {
+  //         text: '30초 안에 번호를 입력하세요 (1-5) | 취소하려면 "취소" 입력'
+  //       }
+  //     };
 
-      await loadingMsg.edit({ content: null, embeds: [embed] });
+  //     await loadingMsg.edit({ content: null, embeds: [embed] });
 
-      try {
-        const filter = m => {
-          if (m.author.id !== message.author.id) return false;
-          if (m.content.toLowerCase() === '취소') return true;
-          const num = parseInt(m.content);
-          return !isNaN(num) && num > 0 && num <= searchResults.length;
-        };
+  //     try {
+  //       const filter = m => {
+  //         if (m.author.id !== message.author.id) return false;
+  //         if (m.content.toLowerCase() === '취소') return true;
+  //         const num = parseInt(m.content);
+  //         return !isNaN(num) && num > 0 && num <= searchResults.length;
+  //       };
 
-        const collected = await message.channel.awaitMessages({
-          filter,
-          max: 1,
-          time: 30000,
-          errors: ['time']
-        });
+  //       const collected = await message.channel.awaitMessages({
+  //         filter,
+  //         max: 1,
+  //         time: 30000,
+  //         errors: ['time']
+  //       });
 
-        const response = collected.first().content;
+  //       const response = collected.first().content;
         
-        // 취소 입력 시
-        if (response.toLowerCase() === '취소') {
-          await loadingMsg.edit({ content: '❌ 검색이 취소되었습니다.', embeds: [] });
-          return;
-        }
+  //       // 취소 입력 시
+  //       if (response.toLowerCase() === '취소') {
+  //         await loadingMsg.edit({ content: '❌ 검색이 취소되었습니다.', embeds: [] });
+  //         return;
+  //       }
 
-        const choice = parseInt(response);
-        const selectedVideo = searchResults[choice - 1];
+  //       const choice = parseInt(response);
+  //       const selectedVideo = searchResults[choice - 1];
 
-        const queue = getServerQueue(message.guild.id);
-        const song = {
-          title: selectedVideo.title,
-          url: selectedVideo.url
-        };
+  //       const queue = getServerQueue(message.guild.id);
+  //       const song = {
+  //         title: selectedVideo.title,
+  //         url: selectedVideo.url
+  //       };
 
-        if (!queue.connection) {
-          const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: message.guild.id,
-            adapterCreator: message.guild.voiceAdapterCreator,
-            selfDeaf: false
-          });
+  //       if (!queue.connection) {
+  //         const connection = joinVoiceChannel({
+  //           channelId: voiceChannel.id,
+  //           guildId: message.guild.id,
+  //           adapterCreator: message.guild.voiceAdapterCreator,
+  //           selfDeaf: false
+  //         });
 
-          queue.connection = connection;
-          queue.voiceChannel = voiceChannel;
-          queue.textChannel = message.channel;
-        }
+  //         queue.connection = connection;
+  //         queue.voiceChannel = voiceChannel;
+  //         queue.textChannel = message.channel;
+  //       }
 
-        queue.songs.push(song);
-        await loadingMsg.edit(`✅ 재생목록에 추가됨: **${song.title}**`);
+  //       queue.songs.push(song);
+  //       await loadingMsg.edit(`✅ 재생목록에 추가됨: **${song.title}**`);
 
-        // 노래 다운로드 시작
-        try {
-          if (!downloadQueue.has(song.url)) {
-            await backgroundDownload(song, message);
-          }
-        } catch (error) {
-          console.error('백그라운드 다운로드 실패:', song.title, error);
-        }
+  //       // 노래 다운로드 시작
+  //       try {
+  //         if (!downloadQueue.has(song.url)) {
+  //           await backgroundDownload(song, message);
+  //         }
+  //       } catch (error) {
+  //         console.error('백그라운드 다운로드 실패:', song.title, error);
+  //       }
 
-        if (!queue.playing) {
-          queue.playing = true;
-          playNext(message.guild.id, message.channel);
-        }
+  //       if (!queue.playing) {
+  //         queue.playing = true;
+  //         playNext(message.guild.id, message.channel);
+  //       }
 
-      } catch (error) {
-        await loadingMsg.edit('❌ 30초 안에 선택하지 않아 취소되었습니다.');
-      }
+  //     } catch (error) {
+  //       await loadingMsg.edit('❌ 30초 안에 선택하지 않아 취소되었습니다.');
+  //     }
 
-    } catch (error) {
-      console.error('검색 중 오류:', error);
-      message.reply(`❌ 오류 발생: ${error.message}`);
-    }
-  }
+  //   } catch (error) {
+  //     console.error('검색 중 오류:', error);
+  //     message.reply(`❌ 오류 발생: ${error.message}`);
+  //   }
+  // }
 
-  // "ㅂ정지" 명령어 처리
-  else if (content === 'ㅂ정지') {
-    const queue = getServerQueue(message.guild.id);
-    if (!queue.player) return message.reply('재생 중인 음악이 없습니다.');
+  // // "ㅂ정지" 명령어 처리
+  // else if (content === 'ㅂ정지') {
+  //   const queue = getServerQueue(message.guild.id);
+  //   if (!queue.player) return message.reply('재생 중인 음악이 없습니다.');
     
-    queue.player.pause();
-    message.reply('⏸️ 음악을 일시정지했습니다.');
-  }
+  //   queue.player.pause();
+  //   message.reply('⏸️ 음악을 일시정지했습니다.');
+  // }
 
-  // "ㅂ재개" 명령어 처리
-  else if (content === 'ㅂ재개') {
-    const queue = getServerQueue(message.guild.id);
-    if (!queue.player) return message.reply('재생 중인 음악이 없습니다.');
+  // // "ㅂ재개" 명령어 처리
+  // else if (content === 'ㅂ재개') {
+  //   const queue = getServerQueue(message.guild.id);
+  //   if (!queue.player) return message.reply('재생 중인 음악이 없습니다.');
     
-    queue.player.unpause();
-    message.reply('▶️ 음악을 다시 재생합니다.');
-  }
+  //   queue.player.unpause();
+  //   message.reply('▶️ 음악을 다시 재생합니다.');
+  // }
 
-  // "ㅂ스킵" 명령어 처리 수정
-  else if (content === 'ㅂ스킵') {
-    const queue = getServerQueue(message.guild.id);
-    if (!queue || !queue.player) return message.reply('❌ 재생 중인 음악이 없습니다.');
-    if (queue.songs.length < 2) return message.reply('❌ 다음 곡이 없습니다.');
+  // // "ㅂ스킵" 명령어 처리 수정
+  // else if (content === 'ㅂ스킵') {
+  //   const queue = getServerQueue(message.guild.id);
+  //   if (!queue || !queue.player) return message.reply('❌ 재생 중인 음악이 없습니다.');
+  //   if (queue.songs.length < 2) return message.reply('❌ 다음 곡이 없습니다.');
     
-    const currentSong = queue.songs[0];
-    queue.songs.shift();  // 현재 곡만 제거
+  //   const currentSong = queue.songs[0];
+  //   queue.songs.shift();  // 현재 곡만 제거
     
-    // 다음 곡 재생
-    playSong(message.guild, queue.songs[0]);
-    message.reply(`⏭️ 스킵: **${currentSong.title}**`);
-  }
+  //   // 다음 곡 재생
+  //   playSong(message.guild, queue.songs[0]);
+  //   message.reply(`⏭️ 스킵: **${currentSong.title}**`);
+  // }
 
-  // "ㅂ대기열" 명령어 처리
-  else if (content === 'ㅂ대기열') {
-    const queue = getServerQueue(message.guild.id);
-    if (!queue || !queue.songs.length) {
-      return message.reply('재생 대기열이 비어있습니다.');
-    }
+  // // "ㅂ대기열" 명령어 처리
+  // else if (content === 'ㅂ대기열') {
+  //   const queue = getServerQueue(message.guild.id);
+  //   if (!queue || !queue.songs.length) {
+  //     return message.reply('재생 대기열이 비어있습니다.');
+  //   }
 
-    const queueList = queue.songs.map((song, index) => {
-      const downloadInfo = downloadQueue.get(song.url);
-      let status = '';
-      if (downloadInfo) {
-        if (downloadInfo.status === 'completed') {
-          status = '✅ 준비됨';
-        } else if (downloadInfo.status === 'downloading') {
-          status = `⏳ 다운로드 중 (${downloadInfo.progress}%)`;
-        }
-      } else {
-        status = '⌛ 대기 중';
-      }
-      return `${index === 0 ? '🎵 현재 재생중:' : `${index}.`} **${song.title}** ${status}`;
-    }).join('\n');
+  //   const queueList = queue.songs.map((song, index) => {
+  //     const downloadInfo = downloadQueue.get(song.url);
+  //     let status = '';
+  //     if (downloadInfo) {
+  //       if (downloadInfo.status === 'completed') {
+  //         status = '✅ 준비됨';
+  //       } else if (downloadInfo.status === 'downloading') {
+  //         status = `⏳ 다운로드 중 (${downloadInfo.progress}%)`;
+  //       }
+  //     } else {
+  //       status = '⌛ 대기 중';
+  //     }
+  //     return `${index === 0 ? '🎵 현재 재생중:' : `${index}.`} **${song.title}** ${status}`;
+  //   }).join('\n');
 
-    const embed = {
-      color: 0x0099ff,
-      title: '🎵 재생 대기열',
-      description: queueList
-    };
+  //   const embed = {
+  //     color: 0x0099ff,
+  //     title: '🎵 재생 대기열',
+  //     description: queueList
+  //   };
 
-    message.reply({ embeds: [embed] });
-  }
+  //   message.reply({ embeds: [embed] });
+  // }
 
-  // "ㅂ나가기" 명령어 처리
-  else if (content === 'ㅂ나가기' || content === 'ㅂ나가') {
-    const queue = getServerQueue(message.guild.id);
-    if (!queue.connection) return message.reply('이미 음성 채널에 없습니다.');
+  // // "ㅂ나가기" 명령어 처리
+  // else if (content === 'ㅂ나가기' || content === 'ㅂ나가') {
+  //   const queue = getServerQueue(message.guild.id);
+  //   if (!queue.connection) return message.reply('이미 음성 채널에 없습니다.');
 
-    queue.songs = [];
-    queue.player?.stop();
-    queue.connection.destroy();
-    queues.delete(message.guild.id);
-    message.reply(' 음성 채널에서 나갔습니다.');
-  }
+  //   queue.songs = [];
+  //   queue.player?.stop();
+  //   queue.connection.destroy();
+  //   queues.delete(message.guild.id);
+  //   message.reply(' 음성 채널에서 나갔습니다.');
+  // }
 
-  // "ㅂ볼륨" 명령어 처리
-  else if (content.startsWith('ㅂ볼륨')) {
-    const volume = parseInt(content.split(' ')[1]);
-    if (isNaN(volume) || volume < 0 || volume > 100) {
-      return message.reply('볼륨은 0에서 100 사이의 숫자로 설정해주세요.');
-    }
+  // // "ㅂ볼륨" 명령어 처리
+  // else if (content.startsWith('ㅂ볼륨')) {
+  //   const volume = parseInt(content.split(' ')[1]);
+  //   if (isNaN(volume) || volume < 0 || volume > 100) {
+  //     return message.reply('볼륨은 0에서 100 사이의 숫자로 설정해주세요.');
+  //   }
 
-    const queue = getServerQueue(message.guild.id);
-    if (!queue) {
-      return message.reply('현재 재생 중인 음악이 없습니다.');
-    }
+  //   const queue = getServerQueue(message.guild.id);
+  //   if (!queue) {
+  //     return message.reply('현재 재생 중인 음악이 없습니다.');
+  //   }
 
-    // 볼륨 설정 저장
-    volumeSettings.set(message.guild.id, volume);
-    saveVolumeSettings();  // 볼륨 설정을 파일에 저장
+  //   // 볼륨 설정 저장
+  //   volumeSettings.set(message.guild.id, volume);
+  //   saveVolumeSettings();  // 볼륨 설정을 파일에 저장
 
-    // 현재 재생 중인 음악의 볼륨 조절
-    if (queue.player && queue.player.state.resource) {
-      queue.player.state.resource.volume.setVolume(volume / 100);
-    }
+  //   // 현재 재생 중인 음악의 볼륨 조절
+  //   if (queue.player && queue.player.state.resource) {
+  //     queue.player.state.resource.volume.setVolume(volume / 100);
+  //   }
 
-    message.reply(`🔊 볼륨이 ${volume}%로 설정되었습니다.`);
-  }
+  //   message.reply(`🔊 볼륨이 ${volume}%로 설정되었습니다.`);
+  // }
 
   // "ㅂ선착" 명령어 처리 부분
   else if (content.startsWith('ㅂ선착')) {
