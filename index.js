@@ -3146,43 +3146,7 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // TTS 메시지 처리
-  else if (ttsSettings.get(message.author.id)?.enabled) {
-    const voiceChannel = message.member?.voice.channel;
-    if (!voiceChannel) {
-      message.reply('❌ TTS를 사용하려면 음성 채널에 먼저 입장해주세요.');
-      return;
-    }
-
-    try {
-      const settings = ttsSettings.get(message.author.id);
-      
-      // 서버의 TTS 큐 초기화 또는 가져오기
-      if (!ttsQueues.has(message.guildId)) {
-        ttsQueues.set(message.guildId, {
-          items: [],
-          isProcessing: false
-        });
-      }
-      
-      const queue = ttsQueues.get(message.guildId);
-      
-      // 큐에 새 메시지 추가
-      queue.items.push({
-        text: message.content,
-        language: settings.language,
-        voiceChannel: voiceChannel,
-        userId: message.author.id
-      });
-
-      // 큐 처리 시작
-      processTTSQueue(message.guildId);
-
-    } catch (error) {
-      console.error('TTS 큐 처리 중 오류:', error);
-      message.reply('❌ TTS 처리 중 오류가 발생했습니다.');
-    }
-  }
+  
 });
 
 // 타임아웃 감지
