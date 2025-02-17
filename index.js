@@ -4085,21 +4085,64 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-// Firebase 초기화
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// 데이터 저장 함수들
-async function saveValorantSettings() {
+// Firebase 초기화를 async 함수로 변경
+async function initializeFirebase() {
   try {
-    await setDoc(doc(db, 'settings', 'valorant'), valorantSettings);
-    console.log('발로란트 설정 저장 완료');
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    // Firestore 연결 테스트
+    await getDoc(doc(db, 'test', 'test'));
+    console.log('Firebase 연결 성공');
+    return db;
   } catch (error) {
-    console.error('발로란트 설정 저장 실패:', error);
+    console.error('Firebase 초기화 실패:', error);
+    throw error;
   }
 }
 
-async function saveStats() {
+// 봇 시작 시 초기화 수정
+client.once('ready', async () => {
+  console.log(`로그인 완료: ${client.user.tag}`);
+  
+  try {
+    // Firebase 초기화
+    const db = await initializeFirebase();
+    
+    // 모든 데이터 로드
+    await Promise.all([
+      loadStats(db),
+      loadValorantSettings(db),
+      loadTimeoutHistory(db),
+      loadVoiceLog(db),
+      loadVolumeSettings(db),
+      loadTimers(db)
+    ]);
+    
+    console.log('초기화 완료');
+    
+    // 자동 저장 타이머 설정
+    setInterval(async () => {
+      try {
+        await Promise.all([
+          saveStats(db),
+          saveValorantSettings(db),
+          saveTimeoutHistory(db),
+          saveVoiceLog(db)
+        ]);
+        console.log('데이터 자동 저장 완료');
+      } catch (error) {
+        console.error('데이터 자동 저장 중 오류:', error);
+      }
+    }, 60 * 1000);  // 1분마다 저장
+    
+  } catch (error) {
+    console.error('초기화 중 오류 발생:', error);
+  }
+});
+
+// 데이터 저장/로드 함수들에 db 매개변수 추가
+async function saveStats(db) {
   try {
     await setDoc(doc(db, 'stats', 'user'), userStats);
     console.log('통계 데이터 저장 완료');
@@ -4107,6 +4150,24 @@ async function saveStats() {
     console.error('통계 데이터 저장 실패:', error);
   }
 }
+
+async function loadStats(db) {
+  try {
+    const docSnap = await getDoc(doc(db, 'stats', 'user'));
+    if (docSnap.exists()) {
+      userStats = docSnap.data();
+      console.log('통계 데이터를 성공적으로 불러왔습니다.');
+    } else {
+      userStats = { voiceTime: {}, messageCount: {} };
+      console.log('통계 데이터가 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('통계 데이터 로드 실패:', error);
+    userStats = { voiceTime: {}, messageCount: {} };
+  }
+}
+
+// 나머지 저장/로드 함수들도 같은 방식으로 수정
 
 async function saveTimeoutHistory() {
   try {
@@ -4123,39 +4184,6 @@ async function saveVoiceLog() {
     console.log('음성 로그 저장 완료');
   } catch (error) {
     console.error('음성 로그 저장 실패:', error);
-  }
-}
-
-// 데이터 로드 함수들
-async function loadValorantSettings() {
-  try {
-    const docSnap = await getDoc(doc(db, 'settings', 'valorant'));
-    if (docSnap.exists()) {
-      valorantSettings = docSnap.data();
-      console.log('발로란트 설정을 성공적으로 불러왔습니다.');
-    } else {
-      valorantSettings = {};
-      console.log('발로란트 설정이 없어 새로 생성합니다.');
-    }
-  } catch (error) {
-    console.error('발로란트 설정 로드 실패:', error);
-    valorantSettings = {};
-  }
-}
-
-async function loadStats() {
-  try {
-    const docSnap = await getDoc(doc(db, 'stats', 'user'));
-    if (docSnap.exists()) {
-      userStats = docSnap.data();
-      console.log('통계 데이터를 성공적으로 불러왔습니다.');
-    } else {
-      userStats = { voiceTime: {}, messageCount: {} };
-      console.log('통계 데이터가 없어 새로 생성합니다.');
-    }
-  } catch (error) {
-    console.error('통계 데이터 로드 실패:', error);
-    userStats = { voiceTime: {}, messageCount: {} };
   }
 }
 
@@ -4191,117 +4219,58 @@ async function loadVoiceLog() {
   }
 }
 
-// 봇 시작 시 초기화 수정
-client.once('ready', async () => {
-  console.log(`로그인 완료: ${client.user.tag}`);
-  
-  // 모든 데이터 로드
-  await Promise.all([
-    loadStats(),
-    loadValorantSettings(),
-    loadTimeoutHistory(),
-    loadVoiceLog(),
-    loadVolumeSettings()  // 볼륨 설정 로드 추가
-  ]);
-  
-  console.log('초기화 완료');
-});
-
-// 음성 채널 상태 변경 감지
-client.on('voiceStateUpdate', async (oldState, newState) => {
-  // 봇 제외
-  if (newState.member.user.bot && newState.member.roles.cache.has('1135868235108065391')) {
-    return;
-  }
-
-  const logChannel = newState.guild.channels.cache.get(LOG_CHANNEL_ID);
-  if (!logChannel) return;
-
-  const userId = newState.member.id;
-  const guildId = newState.guild.id;
-
+async function loadVolumeSettings() {
   try {
-    // 음성 채널 입장 시간 기록
-    if (!oldState.channelId && newState.channelId) {
-      await setDoc(doc(db, 'voice_sessions', `${guildId}_${userId}`), {
-        startTime: Date.now(),
-        channelId: newState.channelId,
-        userId: userId,
-        guildId: guildId
-      });
+    const docSnap = await getDoc(doc(db, 'settings', 'volume'));
+    if (docSnap.exists()) {
+      const settings = docSnap.data();
+      volumeSettings = new Map(Object.entries(settings));
+      console.log('볼륨 설정을 성공적으로 불러왔습니다.');
+    } else {
+      volumeSettings = new Map();
+      console.log('볼륨 설정이 없어 새로 생성합니다.');
     }
-
-    // 음성 채널 퇴장 시 통화 시간 계산
-    if (oldState.channelId && !newState.channelId) {
-      const sessionDoc = await getDoc(doc(db, 'voice_sessions', `${guildId}_${userId}`));
-      if (sessionDoc.exists()) {
-        const session = sessionDoc.data();
-        const duration = Date.now() - session.startTime;
-
-        // 통계 문서 가져오기
-        const statsDoc = await getDoc(doc(db, 'stats', 'user'));
-        const stats = statsDoc.exists() ? statsDoc.data() : { voiceTime: {} };
-
-        // 통화 시간 업데이트
-        if (!stats.voiceTime) stats.voiceTime = {};
-        stats.voiceTime[userId] = (stats.voiceTime[userId] || 0) + duration;
-
-        // 통계 저장
-        await setDoc(doc(db, 'stats', 'user'), stats);
-
-        // 세션 문서 삭제
-        await deleteDoc(doc(db, 'voice_sessions', `${guildId}_${userId}`));
-      }
-    }
-
-    // 로그 기록
-    const currentTime = new Date().toLocaleTimeString('ko-KR', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-
-    // 로그 저장
-    await addDoc(collection(db, 'voice_logs'), {
-      timestamp: Date.now(),
-      userId: userId,
-      guildId: guildId,
-      oldChannelId: oldState.channelId,
-      newChannelId: newState.channelId,
-      memberName: newState.member.displayName,
-      type: !oldState.channelId ? 'join' : !newState.channelId ? 'leave' : 'move'
-    });
-
-    // 로그 메시지 전송
-    if (!oldState.channelId && newState.channelId) {
-      logChannel.send(`[${currentTime}] 🎙️ ${newState.member.displayName}님이 ${newState.channel.name} 채널에 입장했습니다.`);
-    } else if (oldState.channelId && !newState.channelId) {
-      logChannel.send(`[${currentTime}] 🚪 ${oldState.member.displayName}님이 ${oldState.channel.name} 채널에서 퇴장했습니다.`);
-    } else if (oldState.channelId !== newState.channelId && oldState.channelId && newState.channelId) {
-      logChannel.send(`[${currentTime}] ↔️ ${newState.member.displayName}님이 ${oldState.channel.name} 채널에서 ${newState.channel.name} 채널로 이동했습니다.`);
-    }
-
   } catch (error) {
-    console.error('음성 채널 로그 처리 중 오류:', error);
-  }
-});
-
-
-// 타이머 저장
-async function saveTimer(userId, timer) {
-  try {
-    await setDoc(doc(db, 'timers', userId), {
-      endTime: timer.endTime,
-      duration: timer.duration,
-      createdAt: Date.now()
-    });
-  } catch (error) {
-    console.error('타이머 저장 중 오류:', error);
+    console.error('볼륨 설정 로드 실패:', error);
+    volumeSettings = new Map();
   }
 }
 
-// 타이머 로드
+async function saveVolumeSettings() {
+  try {
+    const settings = Object.fromEntries(volumeSettings);
+    await setDoc(doc(db, 'settings', 'volume'), settings);
+    console.log('볼륨 설정 저장 완료');
+  } catch (error) {
+    console.error('볼륨 설정 저장 중 오류 발생:', error);
+  }
+}
+
+async function saveValorantSettings() {
+  try {
+    await setDoc(doc(db, 'settings', 'valorant'), valorantSettings);
+    console.log('발로란트 설정 저장 완료');
+  } catch (error) {
+    console.error('발로란트 설정 저장 실패:', error);
+  }
+}
+
+async function loadValorantSettings() {
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'valorant'));
+    if (docSnap.exists()) {
+      valorantSettings = docSnap.data();
+      console.log('발로란트 설정을 성공적으로 불러왔습니다.');
+    } else {
+      valorantSettings = {};
+      console.log('발로란트 설정이 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('발로란트 설정 로드 실패:', error);
+    valorantSettings = {};
+  }
+}
+
 async function loadTimers() {
   try {
     const timersSnapshot = await getDocs(collection(db, 'timers'));
@@ -4330,21 +4299,84 @@ async function loadTimers() {
   }
 }
 
-// 봇 시작 시 타이머 로드
-client.once('ready', async () => {
-  console.log(`로그인 완료: ${client.user.tag}`);
-  
-  // 모든 데이터 로드
-  await Promise.all([
-    loadStats(),
-    loadValorantSettings(),
-    loadTimeoutHistory(),
-    loadVoiceLog(),
-    loadVolumeSettings(),
-    loadTimers()  // 타이머 로드 추가
-  ]);
-  
-  console.log('초기화 완료');
-});
+async function saveTimer(userId, timer) {
+  try {
+    await setDoc(doc(db, 'timers', userId), {
+      endTime: timer.endTime,
+      duration: timer.duration,
+      createdAt: Date.now()
+    });
+  } catch (error) {
+    console.error('타이머 저장 중 오류:', error);
+  }
+}
+
+async function loadTimers() {
+  try {
+    const timersSnapshot = await getDocs(collection(db, 'timers'));
+    timersSnapshot.forEach(doc => {
+      const timer = doc.data();
+      const remainingTime = timer.endTime - Date.now();
+      
+      if (remainingTime > 0) {
+        // 남은 시간이 있는 타이머만 복원
+        activeTimers.set(doc.id, {
+          endTime: timer.endTime,
+          duration: timer.duration,
+          timeout: setTimeout(async () => {
+            // 타이머 종료 처리
+            activeTimers.delete(doc.id);
+            await deleteDoc(doc(db, 'timers', doc.id));
+          }, remainingTime)
+        });
+      } else {
+        // 이미 끝난 타이머는 삭제
+        deleteDoc(doc(db, 'timers', doc.id));
+      }
+    });
+  } catch (error) {
+    console.error('타이머 로드 중 오류:', error);
+  }
+}
+
+async function saveTimer(userId, timer) {
+  try {
+    await setDoc(doc(db, 'timers', userId), {
+      endTime: timer.endTime,
+      duration: timer.duration,
+      createdAt: Date.now()
+    });
+  } catch (error) {
+    console.error('타이머 저장 중 오류:', error);
+  }
+}
+
+async function loadTimers() {
+  try {
+    const timersSnapshot = await getDocs(collection(db, 'timers'));
+    timersSnapshot.forEach(doc => {
+      const timer = doc.data();
+      const remainingTime = timer.endTime - Date.now();
+      
+      if (remainingTime > 0) {
+        // 남은 시간이 있는 타이머만 복원
+        activeTimers.set(doc.id, {
+          endTime: timer.endTime,
+          duration: timer.duration,
+          timeout: setTimeout(async () => {
+            // 타이머 종료 처리
+            activeTimers.delete(doc.id);
+            await deleteDoc(doc(db, 'timers', doc.id));
+          }, remainingTime)
+        });
+      } else {
+        // 이미 끝난 타이머는 삭제
+        deleteDoc(doc(db, 'timers', doc.id));
+      }
+    });
+  } catch (error) {
+    console.error('타이머 로드 중 오류:', error);
+  }
+}
 
 client.login(process.env.DISCORD_TOKEN);
