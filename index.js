@@ -4048,7 +4048,7 @@ async function processTTSQueue(guildId) {
 
 // Firebase 관련 import 추가
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, getDocs, connectFirestoreEmulator } from 'firebase/firestore';
 
 // Firebase 설정
 const firebaseConfig = {
@@ -4060,22 +4060,45 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-// Firebase 초기화
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Firebase 초기화 함수
+async function initializeFirebase() {
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 연결 테스트
+    try {
+      await setDoc(doc(db, 'test', 'connection'), {
+        timestamp: Date.now(),
+        status: 'connected'
+      });
+      console.log('Firebase 연결 성공');
+      return db;
+    } catch (error) {
+      console.error('Firebase 연결 테스트 실패:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Firebase 초기화 실패:', error);
+    throw error;
+  }
+}
 
 // 봇 시작 시 초기화
 client.once('ready', async () => {
   console.log(`로그인 완료: ${client.user.tag}`);
   
   try {
+    // Firebase 초기화 먼저 실행
+    const db = await initializeFirebase();
+    
     // 모든 데이터 로드
     await Promise.all([
-      loadStats(),
-      loadValorantSettings(),
-      loadTimeoutHistory(),
-      loadVoiceLog(),
-      loadVolumeSettings()
+      loadStats(db),
+      loadValorantSettings(db),
+      loadTimeoutHistory(db),
+      loadVoiceLog(db),
+      loadVolumeSettings(db)
     ]);
     
     console.log('초기화 완료');
@@ -4084,11 +4107,11 @@ client.once('ready', async () => {
     setInterval(async () => {
       try {
         await Promise.all([
-          saveStats(),
-          saveValorantSettings(),
-          saveTimeoutHistory(),
-          saveVoiceLog(),
-          saveVolumeSettings()
+          saveStats(db),
+          saveValorantSettings(db),
+          saveTimeoutHistory(db),
+          saveVoiceLog(db),
+          saveVolumeSettings(db)
         ]);
         console.log('데이터 자동 저장 완료');
       } catch (error) {
@@ -4101,8 +4124,8 @@ client.once('ready', async () => {
   }
 });
 
-// 데이터 저장/로드 함수들
-async function saveStats() {
+// 데이터 저장/로드 함수들에 db 매개변수 추가
+async function saveStats(db) {
   try {
     await setDoc(doc(db, 'stats', 'user'), userStats);
     console.log('통계 데이터 저장 완료');
@@ -4111,7 +4134,7 @@ async function saveStats() {
   }
 }
 
-async function loadStats() {
+async function loadStats(db) {
   try {
     const docSnap = await getDoc(doc(db, 'stats', 'user'));
     if (docSnap.exists()) {
@@ -4127,8 +4150,8 @@ async function loadStats() {
   }
 }
 
-// 나머지 저장/로드 함수들도 같은 방식으로 수정
-async function saveValorantSettings() {
+// 나머지 함수들도 같은 방식으로 db 매개변수 추가
+async function saveValorantSettings(db) {
   try {
     await setDoc(doc(db, 'settings', 'valorant'), valorantSettings);
     console.log('발로란트 설정 저장 완료');
@@ -4137,7 +4160,7 @@ async function saveValorantSettings() {
   }
 }
 
-async function loadValorantSettings() {
+async function loadValorantSettings(db) {
   try {
     const docSnap = await getDoc(doc(db, 'settings', 'valorant'));
     if (docSnap.exists()) {
@@ -4153,7 +4176,7 @@ async function loadValorantSettings() {
   }
 }
 
-async function saveTimeoutHistory() {
+async function saveTimeoutHistory(db) {
   try {
     await setDoc(doc(db, 'history', 'timeout'), timeoutHistoryData);
     console.log('타임아웃 기록 저장 완료');
@@ -4162,7 +4185,7 @@ async function saveTimeoutHistory() {
   }
 }
 
-async function loadTimeoutHistory() {
+async function loadTimeoutHistory(db) {
   try {
     const docSnap = await getDoc(doc(db, 'history', 'timeout'));
     if (docSnap.exists()) {
@@ -4178,7 +4201,7 @@ async function loadTimeoutHistory() {
   }
 }
 
-async function saveVoiceLog() {
+async function saveVoiceLog(db) {
   try {
     await setDoc(doc(db, 'logs', 'voice'), voiceLogData);
     console.log('음성 로그 저장 완료');
@@ -4187,7 +4210,7 @@ async function saveVoiceLog() {
   }
 }
 
-async function loadVoiceLog() {
+async function loadVoiceLog(db) {
   try {
     const docSnap = await getDoc(doc(db, 'logs', 'voice'));
     if (docSnap.exists()) {
@@ -4203,7 +4226,7 @@ async function loadVoiceLog() {
   }
 }
 
-async function saveVolumeSettings() {
+async function saveVolumeSettings(db) {
   try {
     const settings = Object.fromEntries(volumeSettings);
     await setDoc(doc(db, 'settings', 'volume'), settings);
@@ -4213,7 +4236,7 @@ async function saveVolumeSettings() {
   }
 }
 
-async function loadVolumeSettings() {
+async function loadVolumeSettings(db) {
   try {
     const docSnap = await getDoc(doc(db, 'settings', 'volume'));
     if (docSnap.exists()) {
@@ -4242,7 +4265,7 @@ async function saveTimer(userId, timer) {
   }
 }
 
-async function loadTimers() {
+async function loadTimers(db) {
   try {
     const timersSnapshot = await getDocs(collection(db, 'timers'));
     timersSnapshot.forEach(doc => {
