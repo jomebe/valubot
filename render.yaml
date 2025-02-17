@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: discord-bot
+    env: node
+    packages:
+      - python3
+      - python3-pip
+      - ffmpeg
+    buildCommand: >
+      mkdir -p node_modules/.bin &&
+      curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o node_modules/.bin/yt-dlp &&
+      chmod +x node_modules/.bin/yt-dlp &&
+      npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18.16.0
+      - key: PATH
+        value: /opt/render/project/src/node_modules/.bin:${PATH}
