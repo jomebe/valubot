@@ -12,6 +12,7 @@ import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import getMP3Duration from 'get-mp3-duration';
+import { entersState, VoiceConnectionStatus } from '@discordjs/voice';
 
 // ES modules에서 __dirname 사용하기 위한 설정
 const __filename = fileURLToPath(import.meta.url);
@@ -2425,29 +2426,75 @@ client.on('messageCreate', async (message) => {
 
   // 플레이어 비교 함수 수정
   else if (content.startsWith('ㅂ비교')) {
-    const args = content.slice(3).trim().split('vs');
-    if (args.length !== 2) {
-      return message.reply('사용법: ㅂ비교 닉네임1#태그1 vs 닉네임2#태그2');
+    const args = content.slice(3).trim().split(/\s+/);
+    
+    if (args.length < 2) {
+      return message.reply('사용법:\n1. ㅂ비교 닉네임#태그 닉네임#태그\n2. ㅂ비교 디스코드닉네임 디스코드닉네임');
     }
-
-    const player1Info = args[0].trim().split('#');
-    const player2Info = args[1].trim().split('#');
-
-    if (player1Info.length !== 2 || player2Info.length !== 2) {
-      return message.reply('❌ 올바른 형식이 아닙니다.\n사용법: ㅂ비교 닉네임1#태그1 vs 닉네임2#태그2');
-    }
-
-    const player1 = {
-      name: player1Info[0].trim(),
-      tag: player1Info[1].trim()
-    };
-
-    const player2 = {
-      name: player2Info[0].trim(),
-      tag: player2Info[1].trim()
-    };
 
     try {
+      let player1, player2;
+
+      // 첫 번째 플레이어 정보 가져오기
+      if (args[0].includes('#')) {
+        // 닉네임#태그 형식
+        const [name1, tag1] = args[0].split('#');
+        player1 = { name: name1, tag: tag1 };
+      } else {
+        // 디스코드 닉네임으로 검색
+        const discordName1 = args[0];
+        const member1 = message.guild.members.cache.find(m => 
+          m.displayName.toLowerCase() === discordName1.toLowerCase() || 
+          m.user.username.toLowerCase() === discordName1.toLowerCase()
+        );
+        
+        if (!member1) {
+          return message.reply(`❌ '${discordName1}' 유저를 찾을 수 없습니다.`);
+        }
+        
+        const valorantAccount1 = valorantSettings[member1.id];
+        if (!valorantAccount1?.name || !valorantAccount1?.tag) {  // null check 추가
+          return message.reply(`❌ '${discordName1}' 유저의 발로란트 계정이 등록되어 있지 않습니다.`);
+        }
+        
+        player1 = { 
+          name: valorantAccount1.name.trim(), 
+          tag: valorantAccount1.tag.trim() 
+        };
+      }
+
+      // 두 번째 플레이어 정보 가져오기
+      if (args[1].includes('#')) {
+        // 닉네임#태그 형식
+        const [name2, tag2] = args[1].split('#');
+        player2 = { name: name2, tag: tag2 };
+      } else {
+        // 디스코드 닉네임으로 검색
+        const discordName2 = args[1];
+        const member2 = message.guild.members.cache.find(m => 
+          m.displayName.toLowerCase() === discordName2.toLowerCase() || 
+          m.user.username.toLowerCase() === discordName2.toLowerCase()
+        );
+        
+        if (!member2) {
+          return message.reply(`❌ '${discordName2}' 유저를 찾을 수 없습니다.`);
+        }
+        
+        const valorantAccount2 = valorantSettings[member2.id];
+        if (!valorantAccount2?.name || !valorantAccount2?.tag) {  // null check 추가
+          return message.reply(`❌ '${discordName2}' 유저의 발로란트 계정이 등록되어 있지 않습니다.`);
+        }
+        
+        player2 = { 
+          name: valorantAccount2.name.trim(), 
+          tag: valorantAccount2.tag.trim() 
+        };
+      }
+
+      // 디버그 로그 추가
+      console.log('Player 1:', player1);
+      console.log('Player 2:', player2);
+
       const loadingMsg = await message.reply('🔍 플레이어 통계를 비교중입니다...');
       const comparison = await compareStats(player1, player2);
       await loadingMsg.edit({ content: null, embeds: [comparison.embed] });
@@ -2455,10 +2502,8 @@ client.on('messageCreate', async (message) => {
       console.error('플레이어 비교 실패:', error);
       if (error.response?.status === 404) {
         message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
-      } else if (error.response?.status === 429) {
-        message.reply('❌ 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
       } else {
-        message.reply('❌ 플레이어 비교 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        message.reply('❌ 플레이어 통계 비교 중 오류가 발생했습니다.');
       }
     }
   }
@@ -2734,80 +2779,94 @@ client.on('messageCreate', async (message) => {
 
   // TTS 처리 부분에서 언어 설정 사용
   else if (ttsSettings.get(message.author.id)?.enabled) {
-    // 메시지 작성자가 음성 채널에 있는지 확인
     const voiceChannel = message.member?.voice.channel;
     if (!voiceChannel) {
       return message.reply('❌ TTS를 사용하려면 음성 채널에 먼저 입장해주세요.');
     }
 
     try {
-      // 현재 봇의 음성 연결 확인
       let connection = getVoiceConnection(message.guild.id);
       
-      // 연결이 없거나 다른 채널에 있으면 새로 연결
-      if (!connection || 
-          connection.joinConfig.channelId !== voiceChannel.id || 
-          connection.state.status === 'destroyed' || 
-          !message.guild.members.me.voice.channel) {  // 봇이 음성 채널에 없는 경우 추가
-        
-        // 기존 연결이 있다면 끊기
+      // 연결 상태 확인 및 재연결 로직 개선
+      if (!connection || connection.state.status !== 'ready' || connection.joinConfig.channelId !== voiceChannel.id) {
+        // 기존 연결이 있다면 정리
         if (connection) {
           connection.destroy();
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 연결 정리 대기
         }
-        
-        // 새로운 채널에 연결 (자동 연결 해제 방지 옵션 추가)
+
+        // 새로운 연결 시도
         connection = joinVoiceChannel({
           channelId: voiceChannel.id,
           guildId: message.guild.id,
           adapterCreator: message.guild.voiceAdapterCreator,
           selfDeaf: false,
-          selfMute: false,
-          debug: true
+          selfMute: false
         });
 
-        // 연결 유지를 위한 이벤트 핸들러
+        // 연결 준비 대기
+        try {
+          await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
+        } catch (error) {
+          connection.destroy();
+          throw new Error('음성 채널 연결 실패');
+        }
+
+        // 연결 상태 모니터링
         connection.on('stateChange', (oldState, newState) => {
-          const oldNetworking = Reflect.get(oldState, 'networking');
-          const newNetworking = Reflect.get(newState, 'networking');
+          console.log(`Voice Connection State Changed: ${oldState.status} -> ${newState.status}`);
           
-          const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
-            const newUdp = Reflect.get(newNetworkState, 'udp');
-            clearInterval(newUdp?.keepAliveInterval);
+          // 연결이 끊어진 경우 정리
+          if (newState.status === VoiceConnectionStatus.Disconnected) {
+            try {
+              connection.destroy();
+            } catch (error) {
+              console.error('Voice connection cleanup error:', error);
+            }
           }
-          
-          oldNetworking?.off('stateChange', networkStateChangeHandler);
-          newNetworking?.on('stateChange', networkStateChangeHandler);
         });
       }
 
-      // 임시 파일 경로 생성
+      // 음성 재생 로직
       const tempFile = path.join(TEMP_DIR, `tts_${Date.now()}.mp3`);
-
-      // Google TTS API 호출 및 파일로 저장
       const settings = ttsSettings.get(message.author.id);
       const url = `http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=${encodeURIComponent(message.content)}&tl=${settings.language}`;
+      
       const response = await axios.get(url, { responseType: 'arraybuffer' });
       fs.writeFileSync(tempFile, response.data);
 
-      // 음성 재생
-      const resource = createAudioResource(tempFile);
       const player = createAudioPlayer({
         behaviors: {
           noSubscriber: NoSubscriberBehavior.Play
         }
       });
 
-      player.play(resource);
-      connection.subscribe(player);
+      const resource = createAudioResource(tempFile, {
+        inlineVolume: true
+      });
+      resource.volume.setVolume(0.8);  // 볼륨 약간 낮춤
 
-      // 재생 완료 후 파일 삭제
+      // 플레이어 이벤트 핸들링
+      player.on('error', error => {
+        console.error('Audio player error:', error);
+        try {
+          fs.unlinkSync(tempFile);
+        } catch (err) {
+          console.error('Temp file cleanup error:', err);
+        }
+      });
+
       player.on(AudioPlayerStatus.Idle, () => {
         try {
           fs.unlinkSync(tempFile);
         } catch (error) {
-          console.error('임시 파일 삭제 실패:', error);
+          console.error('Temp file cleanup error:', error);
         }
       });
+
+      // 재생 시작
+      player.play(resource);
+      connection.subscribe(player);
 
     } catch (error) {
       console.error('TTS 실행 중 오류:', error);
