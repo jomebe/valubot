@@ -4060,11 +4060,14 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-// Firebase 초기화를 async 함수로 변경
+// Firebase 초기화 및 db 객체를 전역으로 관리
+let db;
+
+// Firebase 초기화 함수 수정
 async function initializeFirebase() {
   try {
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    db = getFirestore(app);
     
     // Firestore 연결 테스트
     await getDoc(doc(db, 'test', 'test'));
@@ -4076,48 +4079,8 @@ async function initializeFirebase() {
   }
 }
 
-// 봇 시작 시 초기화 수정
-client.once('ready', async () => {
-  console.log(`로그인 완료: ${client.user.tag}`);
-  
-  try {
-    // Firebase 초기화
-    const db = await initializeFirebase();
-    
-    // 모든 데이터 로드
-    await Promise.all([
-      loadStats(db),
-      loadValorantSettings(db),
-      loadTimeoutHistory(db),
-      loadVoiceLog(db),
-      loadVolumeSettings(db),
-      loadTimers(db)
-    ]);
-    
-    console.log('초기화 완료');
-    
-    // 자동 저장 타이머 설정
-    setInterval(async () => {
-      try {
-        await Promise.all([
-          saveStats(db),
-          saveValorantSettings(db),
-          saveTimeoutHistory(db),
-          saveVoiceLog(db)
-        ]);
-        console.log('데이터 자동 저장 완료');
-      } catch (error) {
-        console.error('데이터 자동 저장 중 오류:', error);
-      }
-    }, 60 * 1000);  // 1분마다 저장
-    
-  } catch (error) {
-    console.error('초기화 중 오류 발생:', error);
-  }
-});
-
-// 데이터 저장/로드 함수들에 db 매개변수 추가
-async function saveStats(db) {
+// 데이터 저장/로드 함수들에서 db 매개변수 제거
+async function saveStats() {
   try {
     await setDoc(doc(db, 'stats', 'user'), userStats);
     console.log('통계 데이터 저장 완료');
@@ -4126,7 +4089,7 @@ async function saveStats(db) {
   }
 }
 
-async function loadStats(db) {
+async function loadStats() {
   try {
     const docSnap = await getDoc(doc(db, 'stats', 'user'));
     if (docSnap.exists()) {
