@@ -287,23 +287,7 @@ let timeoutHistoryData = {};
 const VOLUME_SETTINGS_FILE = './volumeSettings.json';
 
 
-// 볼륨 설정 로드 함수 수정
-async function loadVolumeSettings() {
-  try {
-    const docSnap = await getDoc(doc(db, 'settings', 'volume'));
-    if (docSnap.exists()) {
-      const settings = docSnap.data();
-      volumeSettings = new Map(Object.entries(settings));
-      console.log('볼륨 설정을 성공적으로 불러왔습니다.');
-    } else {
-      volumeSettings = new Map();
-      console.log('볼륨 설정이 없어 새로 생성합니다.');
-    }
-  } catch (error) {
-    console.error('볼륨 설정 로드 실패:', error);
-    volumeSettings = new Map();
-  }
-}
+
 
 // 볼륨 설정 저장 함수 수정
 async function saveVolumeSettings() {
@@ -4271,73 +4255,9 @@ async function loadValorantSettings() {
   }
 }
 
-async function loadTimers() {
-  try {
-    const timersSnapshot = await getDocs(collection(db, 'timers'));
-    timersSnapshot.forEach(doc => {
-      const timer = doc.data();
-      const remainingTime = timer.endTime - Date.now();
-      
-      if (remainingTime > 0) {
-        // 남은 시간이 있는 타이머만 복원
-        activeTimers.set(doc.id, {
-          endTime: timer.endTime,
-          duration: timer.duration,
-          timeout: setTimeout(async () => {
-            // 타이머 종료 처리
-            activeTimers.delete(doc.id);
-            await deleteDoc(doc(db, 'timers', doc.id));
-          }, remainingTime)
-        });
-      } else {
-        // 이미 끝난 타이머는 삭제
-        deleteDoc(doc(db, 'timers', doc.id));
-      }
-    });
-  } catch (error) {
-    console.error('타이머 로드 중 오류:', error);
-  }
-}
 
-async function saveTimer(userId, timer) {
-  try {
-    await setDoc(doc(db, 'timers', userId), {
-      endTime: timer.endTime,
-      duration: timer.duration,
-      createdAt: Date.now()
-    });
-  } catch (error) {
-    console.error('타이머 저장 중 오류:', error);
-  }
-}
 
-async function loadTimers() {
-  try {
-    const timersSnapshot = await getDocs(collection(db, 'timers'));
-    timersSnapshot.forEach(doc => {
-      const timer = doc.data();
-      const remainingTime = timer.endTime - Date.now();
-      
-      if (remainingTime > 0) {
-        // 남은 시간이 있는 타이머만 복원
-        activeTimers.set(doc.id, {
-          endTime: timer.endTime,
-          duration: timer.duration,
-          timeout: setTimeout(async () => {
-            // 타이머 종료 처리
-            activeTimers.delete(doc.id);
-            await deleteDoc(doc(db, 'timers', doc.id));
-          }, remainingTime)
-        });
-      } else {
-        // 이미 끝난 타이머는 삭제
-        deleteDoc(doc(db, 'timers', doc.id));
-      }
-    });
-  } catch (error) {
-    console.error('타이머 로드 중 오류:', error);
-  }
-}
+
 
 async function saveTimer(userId, timer) {
   try {
