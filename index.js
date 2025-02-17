@@ -6,16 +6,11 @@ import { Client, GatewayIntentBits, Events, AttachmentBuilder } from 'discord.js
 import { createAudioPlayer, createAudioResource, joinVoiceChannel, AudioPlayerStatus, NoSubscriberBehavior, getVoiceConnection, StreamType } from '@discordjs/voice';
 import OpenAI from 'openai';
 import fs from 'fs';
-import fetch from 'node-fetch';
 import axios from 'axios';
-import play from 'play-dl';
-import ytdl from 'ytdl-core';
 import path from 'path';
 import { exec } from 'child_process';
-import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { readFileSync } from 'fs';
 import getMP3Duration from 'get-mp3-duration';
 
 // ES modules에서 __dirname 사용하기 위한 설정
