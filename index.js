@@ -20,8 +20,8 @@ const __dirname = dirname(__filename);
 
 // config.json 파일 import 수정
 
-// TEMP_DIR 경로 설정
-const TEMP_DIR = 'D:\\temp';  // Windows 경로는 이중 백슬래시 사용
+// TEMP_DIR 경로 설정 수정
+const TEMP_DIR = path.join(__dirname, 'temp');  // 현재 작업 디렉토리의 temp 폴더
 
 // 시작할 때 temp 폴더 존재 확인 및 생성
 if (!fs.existsSync(TEMP_DIR)) {
@@ -3547,8 +3547,16 @@ function cleanupQueue(queue) {
 // 봇 시작 시 초기화 실행
 client.once('ready', async () => {
   console.log(`로그인 완료: ${client.user.tag}`);
-  loadStats();  // 통계 데이터 로드
-  loadValorantSettings();  // 발로란트 설정 로드
+  
+  // 통계 데이터 로드
+  loadStats();
+  console.log('통계 데이터를 성공적으로 불러왔습니다.');
+  
+  // 발로란트 설정 로드
+  loadValorantSettings();
+  console.log('발로란트 설정을 성공적으로 불러왔습니다.');
+  console.log(`등록된 계정 수: ${Object.keys(valorantSettings).length}`);
+  
   console.log('초기화 완료');
 });
 
