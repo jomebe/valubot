@@ -4060,26 +4060,48 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-// Firebase 초기화 및 db 객체를 전역으로 관리
-let db;
+// Firebase 초기화
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-// Firebase 초기화 함수 수정
-async function initializeFirebase() {
+// 봇 시작 시 초기화
+client.once('ready', async () => {
+  console.log(`로그인 완료: ${client.user.tag}`);
+  
   try {
-    const app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
+    // 모든 데이터 로드
+    await Promise.all([
+      loadStats(),
+      loadValorantSettings(),
+      loadTimeoutHistory(),
+      loadVoiceLog(),
+      loadVolumeSettings()
+    ]);
     
-    // Firestore 연결 테스트
-    await getDoc(doc(db, 'test', 'test'));
-    console.log('Firebase 연결 성공');
-    return db;
+    console.log('초기화 완료');
+    
+    // 자동 저장 타이머 설정
+    setInterval(async () => {
+      try {
+        await Promise.all([
+          saveStats(),
+          saveValorantSettings(),
+          saveTimeoutHistory(),
+          saveVoiceLog(),
+          saveVolumeSettings()
+        ]);
+        console.log('데이터 자동 저장 완료');
+      } catch (error) {
+        console.error('데이터 자동 저장 중 오류:', error);
+      }
+    }, 60 * 1000);  // 1분마다 저장
+    
   } catch (error) {
-    console.error('Firebase 초기화 실패:', error);
-    throw error;
+    console.error('초기화 중 오류 발생:', error);
   }
-}
+});
 
-// 데이터 저장/로드 함수들에서 db 매개변수 제거
+// 데이터 저장/로드 함수들
 async function saveStats() {
   try {
     await setDoc(doc(db, 'stats', 'user'), userStats);
@@ -4106,84 +4128,6 @@ async function loadStats() {
 }
 
 // 나머지 저장/로드 함수들도 같은 방식으로 수정
-
-async function saveTimeoutHistory() {
-  try {
-    await setDoc(doc(db, 'history', 'timeout'), timeoutHistoryData);
-    console.log('타임아웃 기록 저장 완료');
-  } catch (error) {
-    console.error('타임아웃 기록 저장 실패:', error);
-  }
-}
-
-async function saveVoiceLog() {
-  try {
-    await setDoc(doc(db, 'logs', 'voice'), voiceLogData);
-    console.log('음성 로그 저장 완료');
-  } catch (error) {
-    console.error('음성 로그 저장 실패:', error);
-  }
-}
-
-async function loadTimeoutHistory() {
-  try {
-    const docSnap = await getDoc(doc(db, 'history', 'timeout'));
-    if (docSnap.exists()) {
-      timeoutHistoryData = docSnap.data();
-      console.log('타임아웃 기록을 성공적으로 불러왔습니다.');
-    } else {
-      timeoutHistoryData = {};
-      console.log('타임아웃 기록이 없어 새로 생성합니다.');
-    }
-  } catch (error) {
-    console.error('타임아웃 기록 로드 실패:', error);
-    timeoutHistoryData = {};
-  }
-}
-
-async function loadVoiceLog() {
-  try {
-    const docSnap = await getDoc(doc(db, 'logs', 'voice'));
-    if (docSnap.exists()) {
-      voiceLogData = docSnap.data();
-      console.log('음성 로그를 성공적으로 불러왔습니다.');
-    } else {
-      voiceLogData = {};
-      console.log('음성 로그가 없어 새로 생성합니다.');
-    }
-  } catch (error) {
-    console.error('음성 로그 로드 실패:', error);
-    voiceLogData = {};
-  }
-}
-
-async function loadVolumeSettings() {
-  try {
-    const docSnap = await getDoc(doc(db, 'settings', 'volume'));
-    if (docSnap.exists()) {
-      const settings = docSnap.data();
-      volumeSettings = new Map(Object.entries(settings));
-      console.log('볼륨 설정을 성공적으로 불러왔습니다.');
-    } else {
-      volumeSettings = new Map();
-      console.log('볼륨 설정이 없어 새로 생성합니다.');
-    }
-  } catch (error) {
-    console.error('볼륨 설정 로드 실패:', error);
-    volumeSettings = new Map();
-  }
-}
-
-async function saveVolumeSettings() {
-  try {
-    const settings = Object.fromEntries(volumeSettings);
-    await setDoc(doc(db, 'settings', 'volume'), settings);
-    console.log('볼륨 설정 저장 완료');
-  } catch (error) {
-    console.error('볼륨 설정 저장 중 오류 발생:', error);
-  }
-}
-
 async function saveValorantSettings() {
   try {
     await setDoc(doc(db, 'settings', 'valorant'), valorantSettings);
@@ -4209,9 +4153,82 @@ async function loadValorantSettings() {
   }
 }
 
+async function saveTimeoutHistory() {
+  try {
+    await setDoc(doc(db, 'history', 'timeout'), timeoutHistoryData);
+    console.log('타임아웃 기록 저장 완료');
+  } catch (error) {
+    console.error('타임아웃 기록 저장 실패:', error);
+  }
+}
 
+async function loadTimeoutHistory() {
+  try {
+    const docSnap = await getDoc(doc(db, 'history', 'timeout'));
+    if (docSnap.exists()) {
+      timeoutHistoryData = docSnap.data();
+      console.log('타임아웃 기록을 성공적으로 불러왔습니다.');
+    } else {
+      timeoutHistoryData = {};
+      console.log('타임아웃 기록이 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('타임아웃 기록 로드 실패:', error);
+    timeoutHistoryData = {};
+  }
+}
 
+async function saveVoiceLog() {
+  try {
+    await setDoc(doc(db, 'logs', 'voice'), voiceLogData);
+    console.log('음성 로그 저장 완료');
+  } catch (error) {
+    console.error('음성 로그 저장 실패:', error);
+  }
+}
 
+async function loadVoiceLog() {
+  try {
+    const docSnap = await getDoc(doc(db, 'logs', 'voice'));
+    if (docSnap.exists()) {
+      voiceLogData = docSnap.data();
+      console.log('음성 로그를 성공적으로 불러왔습니다.');
+    } else {
+      voiceLogData = {};
+      console.log('음성 로그가 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('음성 로그 로드 실패:', error);
+    voiceLogData = {};
+  }
+}
+
+async function saveVolumeSettings() {
+  try {
+    const settings = Object.fromEntries(volumeSettings);
+    await setDoc(doc(db, 'settings', 'volume'), settings);
+    console.log('볼륨 설정 저장 완료');
+  } catch (error) {
+    console.error('볼륨 설정 저장 중 오류 발생:', error);
+  }
+}
+
+async function loadVolumeSettings() {
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'volume'));
+    if (docSnap.exists()) {
+      const settings = docSnap.data();
+      volumeSettings = new Map(Object.entries(settings));
+      console.log('볼륨 설정을 성공적으로 불러왔습니다.');
+    } else {
+      volumeSettings = new Map();
+      console.log('볼륨 설정이 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('볼륨 설정 로드 실패:', error);
+    volumeSettings = new Map();
+  }
+}
 
 async function saveTimer(userId, timer) {
   try {
