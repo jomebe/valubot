@@ -3197,16 +3197,43 @@ function cleanupQueue(queue) {
 client.once('ready', async () => {
   console.log(`로그인 완료: ${client.user.tag}`);
   
-  // 통계 데이터 로드
-  loadStats();
-  console.log('통계 데이터를 성공적으로 불러왔습니다.');
-  
-  // 발로란트 설정 로드
-  loadValorantSettings();
-  console.log('발로란트 설정을 성공적으로 불러왔습니다.');
-  console.log(`등록된 계정 수: ${Object.keys(valorantSettings).length}`);
-  
-  console.log('초기화 완료');
+  try {
+    // Firebase 연결 테스트
+    console.log('Firebase 연결 테스트 시작...');
+    const testRef = doc(db, 'test', 'connection');
+    await setDoc(testRef, { timestamp: Date.now() });
+    console.log('Firebase 연결 성공');
+
+    // 모든 데이터 순차적으로 로드
+    console.log('데이터 로드 시작...');
+    await loadStats();
+    await loadValorantSettings();
+    await loadTimeoutHistory();
+    await loadVoiceLog();
+    await loadVolumeSettings();
+    
+    console.log('모든 데이터 로드 완료');
+
+    // 자동 저장 타이머 설정
+    setInterval(async () => {
+      try {
+        await Promise.all([
+          saveStats(),
+          saveValorantSettings(),
+          saveTimeoutHistory(),
+          saveVoiceLog(),
+          saveVolumeSettings()
+        ]);
+        console.log('데이터 자동 저장 완료');
+      } catch (error) {
+        console.error('데이터 자동 저장 중 오류:', error);
+      }
+    }, 60 * 1000);
+
+    console.log('초기화 완료');
+  } catch (error) {
+    console.error('초기화 중 오류 발생:', error);
+  }
 });
 
 // 검색 함수에 딜레이 추가
@@ -4027,7 +4054,7 @@ async function processTTSQueue(guildId) {
   }
 }
 
-// Firebase 관련 import 추가
+// Firebase 관련 import 수정
 import { initializeApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -4039,9 +4066,8 @@ import {
   collection, 
   addDoc, 
   getDocs,
-  query,
-  where 
-} from 'firebase/firestore';
+  query 
+} from 'firebase/firestore';  // /lite 제거
 
 // Firebase 설정
 const firebaseConfig = {
@@ -4053,98 +4079,67 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-// Firebase 초기화 함수
-async function initializeFirebase() {
-  try {
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // 연결 테스트
-    try {
-      await setDoc(doc(db, 'test', 'connection'), {
-        timestamp: Date.now(),
-        status: 'connected'
-      });
-      console.log('Firebase 연결 성공');
-      return db;
-    } catch (error) {
-      console.error('Firebase 연결 테스트 실패:', error);
-      throw error;
-    }
-  } catch (error) {
-    console.error('Firebase 초기화 실패:', error);
-    throw error;
-  }
-}
-
-// 봇 시작 시 초기화
-client.once('ready', async () => {
-  console.log(`로그인 완료: ${client.user.tag}`);
-  
-  try {
-    // Firebase 초기화 먼저 실행
-    const db = await initializeFirebase();
-    
-    // 모든 데이터 로드
-    await Promise.all([
-      loadStats(db),
-      loadValorantSettings(db),
-      loadTimeoutHistory(db),
-      loadVoiceLog(db),
-      loadVolumeSettings(db)
-    ]);
-    
-    console.log('초기화 완료');
-    
-    // 자동 저장 타이머 설정
-    setInterval(async () => {
-      try {
-        await Promise.all([
-          saveStats(db),
-          saveValorantSettings(db),
-          saveTimeoutHistory(db),
-          saveVoiceLog(db),
-          saveVolumeSettings(db)
-        ]);
-        console.log('데이터 자동 저장 완료');
-      } catch (error) {
-        console.error('데이터 자동 저장 중 오류:', error);
-      }
-    }, 60 * 1000);  // 1분마다 저장
-    
-  } catch (error) {
-    console.error('초기화 중 오류 발생:', error);
-  }
+// Firebase 초기화 부분에 디버그 로그 추가
+console.log('Firebase 설정:', {
+  apiKey: process.env.FIREBASE_API_KEY?.slice(0, 5) + '...',  // API 키는 일부만 표시
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  appId: process.env.FIREBASE_APP_ID?.slice(0, 5) + '...'
 });
 
-// 데이터 저장/로드 함수들에 db 매개변수 추가
-async function saveStats(db) {
+const app = initializeApp(firebaseConfig);
+console.log('Firebase 앱 초기화 완료');
+
+const db = getFirestore(app);
+console.log('Firestore 초기화 완료');
+
+// 데이터 저장/로드 함수들 수정
+async function saveStats() {
+  console.log('통계 데이터 저장 시작...');
   try {
-    await setDoc(doc(db, 'stats', 'user'), userStats);
+    console.log('저장할 데이터:', JSON.stringify(userStats, null, 2));
+    const docRef = doc(db, 'stats', 'user');
+    console.log('문서 저장 시도');
+    await setDoc(docRef, userStats);
     console.log('통계 데이터 저장 완료');
   } catch (error) {
-    console.error('통계 데이터 저장 실패:', error);
+    console.error('통계 데이터 저장 실패. 에러 상세:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
   }
 }
 
-async function loadStats(db) {
+async function loadStats() {
+  console.log('통계 데이터 로드 시작...');
   try {
-    const docSnap = await getDoc(doc(db, 'stats', 'user'));
+    console.log('Firestore 문서 참조 생성');
+    const docRef = doc(db, 'stats', 'user');
+    console.log('문서 가져오기 시도');
+    const docSnap = await getDoc(docRef);
+    console.log('문서 스냅샷:', docSnap.exists() ? '존재함' : '존재하지 않음');
+    
     if (docSnap.exists()) {
       userStats = docSnap.data();
-      console.log('통계 데이터를 성공적으로 불러왔습니다.');
+      console.log('로드된 통계 데이터:', JSON.stringify(userStats, null, 2));
     } else {
       userStats = { voiceTime: {}, messageCount: {} };
-      console.log('통계 데이터가 없어 새로 생성합니다.');
+      console.log('새로운 통계 데이터 생성');
+      await saveStats();
     }
   } catch (error) {
-    console.error('통계 데이터 로드 실패:', error);
+    console.error('통계 데이터 로드 실패. 에러 상세:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     userStats = { voiceTime: {}, messageCount: {} };
   }
 }
 
-// 나머지 함수들도 같은 방식으로 db 매개변수 추가
-async function saveValorantSettings(db) {
+async function saveValorantSettings() {
   try {
     await setDoc(doc(db, 'settings', 'valorant'), valorantSettings);
     console.log('발로란트 설정 저장 완료');
@@ -4153,7 +4148,7 @@ async function saveValorantSettings(db) {
   }
 }
 
-async function loadValorantSettings(db) {
+async function loadValorantSettings() {
   try {
     const docSnap = await getDoc(doc(db, 'settings', 'valorant'));
     if (docSnap.exists()) {
@@ -4169,7 +4164,7 @@ async function loadValorantSettings(db) {
   }
 }
 
-async function saveTimeoutHistory(db) {
+async function saveTimeoutHistory() {
   try {
     await setDoc(doc(db, 'history', 'timeout'), timeoutHistoryData);
     console.log('타임아웃 기록 저장 완료');
@@ -4178,7 +4173,7 @@ async function saveTimeoutHistory(db) {
   }
 }
 
-async function loadTimeoutHistory(db) {
+async function loadTimeoutHistory() {
   try {
     const docSnap = await getDoc(doc(db, 'history', 'timeout'));
     if (docSnap.exists()) {
@@ -4194,7 +4189,7 @@ async function loadTimeoutHistory(db) {
   }
 }
 
-async function saveVoiceLog(db) {
+async function saveVoiceLog() {
   try {
     await setDoc(doc(db, 'logs', 'voice'), voiceLogData);
     console.log('음성 로그 저장 완료');
@@ -4203,7 +4198,7 @@ async function saveVoiceLog(db) {
   }
 }
 
-async function loadVoiceLog(db) {
+async function loadVoiceLog() {
   try {
     const docSnap = await getDoc(doc(db, 'logs', 'voice'));
     if (docSnap.exists()) {
@@ -4219,7 +4214,7 @@ async function loadVoiceLog(db) {
   }
 }
 
-async function saveVolumeSettings(db) {
+async function saveVolumeSettings() {
   try {
     const settings = Object.fromEntries(volumeSettings);
     await setDoc(doc(db, 'settings', 'volume'), settings);
@@ -4229,7 +4224,7 @@ async function saveVolumeSettings(db) {
   }
 }
 
-async function loadVolumeSettings(db) {
+async function loadVolumeSettings() {
   try {
     const docSnap = await getDoc(doc(db, 'settings', 'volume'));
     if (docSnap.exists()) {
@@ -4255,34 +4250,6 @@ async function saveTimer(userId, timer) {
     });
   } catch (error) {
     console.error('타이머 저장 중 오류:', error);
-  }
-}
-
-async function loadTimers() {
-  try {
-    // query로 감싸서 collection 참조
-    const timersRef = query(collection(db, 'timers'));
-    const timersSnapshot = await getDocs(timersRef);
-    
-    timersSnapshot.forEach(doc => {
-      const timer = doc.data();
-      const remainingTime = timer.endTime - Date.now();
-      
-      if (remainingTime > 0) {
-        activeTimers.set(doc.id, {
-          endTime: timer.endTime,
-          duration: timer.duration,
-          timeout: setTimeout(async () => {
-            activeTimers.delete(doc.id);
-            await deleteDoc(doc(db, 'timers', doc.id));
-          }, remainingTime)
-        });
-      } else {
-        deleteDoc(doc(db, 'timers', doc.id));
-      }
-    });
-  } catch (error) {
-    console.error('타이머 로드 중 오류:', error);
   }
 }
 
