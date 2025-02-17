@@ -14,6 +14,118 @@ import { dirname } from 'path';
 import getMP3Duration from 'get-mp3-duration';
 import { entersState, VoiceConnectionStatus } from '@discordjs/voice';
 
+
+// Firebase 관련 import 수정
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  collection, 
+  addDoc, 
+  getDocs,
+  query 
+} from 'firebase/firestore';
+
+// Discord 클라이언트 생성을 먼저 수행
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions
+  ]
+});
+
+// Firebase 설정
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
+};
+
+// Firebase 초기화 및 전역 db 객체 생성
+console.log('Firebase 초기화 시작...');
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+console.log('Firestore 초기화 완료');
+
+// 연결 테스트 함수
+async function testFirebaseConnection() {
+  try {
+    const testDoc = doc(db, 'test', 'connection');
+    await setDoc(testDoc, { timestamp: Date.now() });
+    console.log('Firebase 연결 테스트 성공');
+    return true;
+  } catch (error) {
+    console.error('Firebase 연결 테스트 실패:', error);
+    return false;
+  }
+}
+
+// 봇 시작 시 초기화
+client.once('ready', async () => {
+  console.log(`로그인 완료: ${client.user.tag}`);
+  
+  try {
+    // Firebase 연결 테스트
+    const isConnected = await testFirebaseConnection();
+    if (!isConnected) {
+      throw new Error('Firebase 연결 실패');
+    }
+    
+    // 모든 데이터 로드
+    await Promise.all([
+      loadStats(),
+      loadValorantSettings(),
+      loadTimeoutHistory(),
+      loadVoiceLog(),
+      loadVolumeSettings()
+    ]);
+    
+    console.log('초기화 완료');
+    
+    // 자동 저장 타이머 설정
+    setInterval(async () => {
+      try {
+        await Promise.all([
+          saveStats(),
+          saveValorantSettings(),
+          saveTimeoutHistory(),
+          saveVoiceLog(),
+          saveVolumeSettings()
+        ]);
+        console.log('데이터 자동 저장 완료');
+      } catch (error) {
+        console.error('데이터 자동 저장 중 오류:', error);
+      }
+    }, 60 * 1000);
+    
+  } catch (error) {
+    console.error('초기화 중 오류 발생:', error);
+  }
+});
+
+// 데이터 저장/로드 함수들
+async function saveStats() {
+  try {
+    await setDoc(doc(db, 'stats', 'user'), userStats);
+    console.log('통계 데이터 저장 완료');
+  } catch (error) {
+    console.error('통계 데이터 저장 실패:', error);
+  }
+}
+
+// ... 나머지 함수들도 동일하게 db 사용
+
 // ES modules에서 __dirname 사용하기 위한 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,17 +147,6 @@ if (!fs.existsSync(TEMP_DIR)) {
   }
 }
 
-// Discord 클라이언트 생성
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMessageReactions
-  ]
-});
 
 // 각종 기록을 저장할 객체들
 let voiceCycleCounts = {};
@@ -4054,62 +4155,7 @@ async function processTTSQueue(guildId) {
   }
 }
 
-// Firebase 관련 import 수정
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  collection, 
-  addDoc, 
-  getDocs,
-  query 
-} from 'firebase/firestore';  // /lite 제거
 
-// Firebase 설정
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
-};
-
-// Firebase 초기화 부분에 디버그 로그 추가
-console.log('Firebase 설정:', {
-  apiKey: process.env.FIREBASE_API_KEY?.slice(0, 5) + '...',  // API 키는 일부만 표시
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  appId: process.env.FIREBASE_APP_ID?.slice(0, 5) + '...'
-});
-
-const app = initializeApp(firebaseConfig);
-console.log('Firebase 앱 초기화 완료');
-
-const db = getFirestore(app);
-console.log('Firestore 초기화 완료');
-
-// 데이터 저장/로드 함수들 수정
-async function saveStats() {
-  console.log('통계 데이터 저장 시작...');
-  try {
-    console.log('저장할 데이터:', JSON.stringify(userStats, null, 2));
-    const docRef = doc(db, 'stats', 'user');
-    console.log('문서 저장 시도');
-    await setDoc(docRef, userStats);
-    console.log('통계 데이터 저장 완료');
-  } catch (error) {
-    console.error('통계 데이터 저장 실패. 에러 상세:', {
-      name: error.name,
-      message: error.message,
-      code: error.code,
-      stack: error.stack
-    });
-  }
-}
 
 async function loadStats() {
   console.log('통계 데이터 로드 시작...');
