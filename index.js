@@ -103,6 +103,9 @@ const valorantMaps = [
   }
 ];
 
+
+  // TTS 설정을 저장할 Map
+  const ttsSettings = new Map();
 // 서버별 음악 큐와 볼륨을 저장할 Map 선언 부분 수정
 const queues = new Map();
 const volumeSettings = new Map();  // Map으로 변경
@@ -398,9 +401,9 @@ function saveVolumeSettings() {
 // 봇 시작 시 볼륨 설정 로드 추가
 client.once('ready', async () => {
   console.log(`로그인 완료: ${client.user.tag}`);
-  loadVolumeSettings();  // 볼륨 설정 로드
-  await initializePlayDL();  // play-dl 초기화
-  console.log('play-dl 초기화 완료');
+  // loadVolumeSettings();  // 볼륨 설정 로드
+  // await initializePlayDL();  // play-dl 초기화
+  // console.log('play-dl 초기화 완료');
   loadStats();  // 통계 데이터 로드
   loadValorantSettings();  // 기존 발로란트 설정 로드
 });
@@ -1345,6 +1348,16 @@ client.on('messageCreate', async (message) => {
                  '`리더보드` (ㄹㄷㅂㄷ) - 서버 내 티어 순위\n' +
                  '`조준점 [코드]` (ㅈㅈㅈ) - 조준점 미리보기 생성\n' +
                  '`랜덤맵` (ㄹㄷㅁ) - 랜덤 맵 선택'
+        },
+        {
+          name: '🎙️ TTS 명령어',
+          value: '`tts O/X` - TTS 켜기/끄기\n' +
+                 '`tts언어 [ko/en/ja/ch/la]` - TTS 언어 변경\n' +
+                 '• ko: 한국어\n' +
+                 '• en: 영어\n' +
+                 '• ja: 일본어\n' +
+                 '• ch: 중국어\n' +
+                 '• la: 라틴어'
         },
         {
           name: '🎲 게임/재미',
@@ -2412,72 +2425,41 @@ client.on('messageCreate', async (message) => {
 
   // 플레이어 비교 함수 수정
   else if (content.startsWith('ㅂ비교')) {
-    const args = content.slice(4).trim().split(' vs ');
+    const args = content.slice(3).trim().split('vs');
     if (args.length !== 2) {
-      return message.reply('사용법: ㅂ비교 닉네임1#태그1 vs 닉네임2#태그2\n예시: ㅂ비교 닉네임1#KR1 vs 닉네임2#KR2');
+      return message.reply('사용법: ㅂ비교 닉네임1#태그1 vs 닉네임2#태그2');
     }
 
     const player1Info = args[0].trim().split('#');
     const player2Info = args[1].trim().split('#');
 
     if (player1Info.length !== 2 || player2Info.length !== 2) {
-      return message.reply('올바른 형식으로 입력해주세요.\n예시: ㅂ비교 닉네임1#KR1 vs 닉네임2#KR2');
+      return message.reply('❌ 올바른 형식이 아닙니다.\n사용법: ㅂ비교 닉네임1#태그1 vs 닉네임2#태그2');
     }
 
-    const player1 = { name: player1Info[0], tag: player1Info[1] };
-    const player2 = { name: player2Info[0], tag: player2Info[1] };
+    const player1 = {
+      name: player1Info[0].trim(),
+      tag: player1Info[1].trim()
+    };
+
+    const player2 = {
+      name: player2Info[0].trim(),
+      tag: player2Info[1].trim()
+    };
 
     try {
-      const loadingMsg = await message.reply('🔄 플레이어 통계를 비교중입니다...');
+      const loadingMsg = await message.reply('🔍 플레이어 통계를 비교중입니다...');
       const comparison = await compareStats(player1, player2);
-      
-      // 통계 비교 및 이모지 추가
-      const compareValue = (val1, val2, higherIsBetter = true) => {
-        const diff = parseFloat(val1) - parseFloat(val2);
-        if (Math.abs(diff) < 0.1) return '➖';
-        return (diff > 0) === higherIsBetter ? '🔼' : '🔽';
-      };
-
-      const embed = {
-        color: 0xFF4654,
-        title: '🆚 플레이어 통계 비교',
-        description: '최근 20경기 기준',
-        fields: [
-          {
-            name: `${comparison.player1.name}#${comparison.player1.tag}`,
-            value: `티어: ${comparison.player1.stats.currentTier} (${comparison.player1.stats.currentRR}RR) ${compareValue(comparison.player1.stats.currentRR, comparison.player2.stats.currentRR)}\n` +
-                   `승률: ${comparison.player1.stats.winRate}% ${compareValue(comparison.player1.stats.winRate, comparison.player2.stats.winRate)}\n` +
-                   `KDA: ${comparison.player1.stats.kda} ${compareValue(comparison.player1.stats.kda, comparison.player2.stats.kda)}\n` +
-                   `평균 점수: ${comparison.player1.stats.averageScore} ${compareValue(comparison.player1.stats.averageScore, comparison.player2.stats.averageScore)}\n` +
-                   `헤드샷 비율: ${comparison.player1.stats.headshotPercentage}% ${compareValue(comparison.player1.stats.headshotPercentage, comparison.player2.stats.headshotPercentage)}\n` +
-                   `평균 K/D/A: ${comparison.player1.stats.averageKills}/${comparison.player1.stats.averageDeaths}/${comparison.player1.stats.averageAssists}`,
-            inline: true
-          },
-          {
-            name: '\u200b',
-            value: '\u200b',
-            inline: true
-          },
-          {
-            name: `${comparison.player2.name}#${comparison.player2.tag}`,
-            value: `티어: ${comparison.player2.stats.currentTier} (${comparison.player2.stats.currentRR}RR)\n` +
-                   `승률: ${comparison.player2.stats.winRate}%\n` +
-                   `KDA: ${comparison.player2.stats.kda}\n` +
-                   `평균 점수: ${comparison.player2.stats.averageScore}\n` +
-                   `헤드샷 비율: ${comparison.player2.stats.headshotPercentage}%\n` +
-                   `평균 K/D/A: ${comparison.player2.stats.averageKills}/${comparison.player2.stats.averageDeaths}/${comparison.player2.stats.averageAssists}`,
-            inline: true
-          }
-        ],
-        footer: {
-          text: '🔼: 더 좋음 | 🔽: 더 낮음 | ➖: 비슷함'
-        },
-        timestamp: new Date()
-      };
-
-      await loadingMsg.edit({ content: null, embeds: [embed] });
+      await loadingMsg.edit({ content: null, embeds: [comparison.embed] });
     } catch (error) {
-      message.reply('❌ 플레이어 비교 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
+      console.error('플레이어 비교 실패:', error);
+      if (error.response?.status === 404) {
+        message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
+      } else if (error.response?.status === 429) {
+        message.reply('❌ 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
+      } else {
+        message.reply('❌ 플레이어 비교 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      }
     }
   }
 
@@ -2701,6 +2683,316 @@ client.on('messageCreate', async (message) => {
       message.reply('❌ 무기 통계 분석 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
     }
   }
+
+  // "ㅂtts" 명령어 처리 수정
+  else if (content.startsWith('ㅂtts')) {
+    const args = content.slice(4).trim().split(' ');
+    const command = args[0];
+    
+    if (!command) {
+      // 현재 TTS 상태 확인
+      const settings = ttsSettings.get(message.author.id);
+      if (!settings) {
+        return message.reply('사용법:\nㅂtts O/X - TTS 켜기/끄기\nㅂtts언어 [ko/en/ja/ch/la] - 언어 변경\n현재 상태: OFF');
+      }
+      return message.reply(`현재 TTS 상태: ${settings.enabled ? 'ON' : 'OFF'}\n언어: ${settings.language}`);
+    }
+
+    if (command.toUpperCase() === 'O' || command.toUpperCase() === 'X') {
+      const isEnabled = command.toUpperCase() === 'O';
+      const currentSettings = ttsSettings.get(message.author.id) || { language: 'ko' };
+      ttsSettings.set(message.author.id, {
+        enabled: isEnabled,
+        language: currentSettings.language
+      });
+      message.reply(`✅ TTS가 ${isEnabled ? '활성화' : '비활성화'}되었습니다.`);
+    }
+    else if (command === '언어') {
+      const lang = args[1]?.toLowerCase();
+      const supportedLanguages = {
+        'ko': '한국어',
+        'en': '영어',
+        'ja': '일본어',
+        'ch': '중국어',
+        'la': '라틴어'
+      };
+
+      if (!lang || !supportedLanguages[lang]) {
+        return message.reply('지원하는 언어: ko(한국어), en(영어), ja(일본어), ch(중국어), la(라틴어)');
+      }
+
+      const currentSettings = ttsSettings.get(message.author.id) || { enabled: false };
+      ttsSettings.set(message.author.id, {
+        enabled: currentSettings.enabled,
+        language: lang
+      });
+      message.reply(`✅ TTS 언어가 ${supportedLanguages[lang]}로 변경되었습니다.`);
+    } else {
+      message.reply('❌ 올바른 형식이 아닙니다.\nㅂtts O/X - TTS 켜기/끄기\nㅂtts언어 [ko/en/ja/ch/la] - 언어 변경');
+    }
+  }
+
+  // TTS 처리 부분에서 언어 설정 사용
+  else if (ttsSettings.get(message.author.id)?.enabled) {
+    // 메시지 작성자가 음성 채널에 있는지 확인
+    const voiceChannel = message.member?.voice.channel;
+    if (!voiceChannel) {
+      return message.reply('❌ TTS를 사용하려면 음성 채널에 먼저 입장해주세요.');
+    }
+
+    try {
+      // 현재 봇의 음성 연결 확인
+      let connection = getVoiceConnection(message.guild.id);
+      
+      // 연결이 없거나 다른 채널에 있으면 새로 연결
+      if (!connection || 
+          connection.joinConfig.channelId !== voiceChannel.id || 
+          connection.state.status === 'destroyed' || 
+          !message.guild.members.me.voice.channel) {  // 봇이 음성 채널에 없는 경우 추가
+        
+        // 기존 연결이 있다면 끊기
+        if (connection) {
+          connection.destroy();
+        }
+        
+        // 새로운 채널에 연결 (자동 연결 해제 방지 옵션 추가)
+        connection = joinVoiceChannel({
+          channelId: voiceChannel.id,
+          guildId: message.guild.id,
+          adapterCreator: message.guild.voiceAdapterCreator,
+          selfDeaf: false,
+          selfMute: false,
+          debug: true
+        });
+
+        // 연결 유지를 위한 이벤트 핸들러
+        connection.on('stateChange', (oldState, newState) => {
+          const oldNetworking = Reflect.get(oldState, 'networking');
+          const newNetworking = Reflect.get(newState, 'networking');
+          
+          const networkStateChangeHandler = (oldNetworkState, newNetworkState) => {
+            const newUdp = Reflect.get(newNetworkState, 'udp');
+            clearInterval(newUdp?.keepAliveInterval);
+          }
+          
+          oldNetworking?.off('stateChange', networkStateChangeHandler);
+          newNetworking?.on('stateChange', networkStateChangeHandler);
+        });
+      }
+
+      // 임시 파일 경로 생성
+      const tempFile = path.join(TEMP_DIR, `tts_${Date.now()}.mp3`);
+
+      // Google TTS API 호출 및 파일로 저장
+      const settings = ttsSettings.get(message.author.id);
+      const url = `http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=${encodeURIComponent(message.content)}&tl=${settings.language}`;
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      fs.writeFileSync(tempFile, response.data);
+
+      // 음성 재생
+      const resource = createAudioResource(tempFile);
+      const player = createAudioPlayer({
+        behaviors: {
+          noSubscriber: NoSubscriberBehavior.Play
+        }
+      });
+
+      player.play(resource);
+      connection.subscribe(player);
+
+      // 재생 완료 후 파일 삭제
+      player.on(AudioPlayerStatus.Idle, () => {
+        try {
+          fs.unlinkSync(tempFile);
+        } catch (error) {
+          console.error('임시 파일 삭제 실패:', error);
+        }
+      });
+
+    } catch (error) {
+      console.error('TTS 실행 중 오류:', error);
+      message.reply('❌ TTS 실행 중 오류가 발생했습니다.');
+    }
+  }
+
+  // "ㅂ데이터" 명령어 처리 추가
+  else if (content.startsWith('ㅂ데이터')) {
+    // 서버 소유자 확인
+    if (message.author.id !== message.guild.ownerId) {
+      return message.reply('❌ 이 명령어는 서버 소유자만 사용할 수 있습니다.');
+    }
+
+    const args = content.slice(4).trim().split(' ');
+    const subCommand = args[0];
+    const dataType = args[1]?.toLowerCase();
+
+    const dataTypes = {
+      'timeout': {
+        file: './timeoutHistory.json',
+        name: '타임아웃 기록',
+        data: timeoutHistoryData,
+        save: saveTimeoutHistory
+      },
+      'stats': {
+        file: './userStats.json',
+        name: '사용자 통계',
+        data: userStats,
+        save: saveStats
+      },
+      'valorant': {
+        file: './valorantSettings.json',
+        name: '발로란트 설정',
+        data: valorantSettings,
+        save: saveValorantSettings
+      }
+    };
+
+    if (!subCommand || !dataType || !dataTypes[dataType]) {
+      return message.reply(
+        '사용법:\n' +
+        'ㅂ데이터 보기 [timeout/stats/valorant] - 데이터 확인\n' +
+        'ㅂ데이터 초기화 [timeout/stats/valorant] - 데이터 초기화\n' +
+        'ㅂ데이터 백업 [timeout/stats/valorant] - 데이터 백업 파일 받기\n' +
+        'ㅂ데이터 수정 [timeout/stats/valorant] - 데이터 수정'
+      );
+    }
+
+    const selectedData = dataTypes[dataType];
+
+    try {
+      switch (subCommand) {
+        case '보기':
+          // 데이터를 보기 좋게 포맷팅
+          const formattedData = JSON.stringify(selectedData.data, null, 2);
+          
+          // 데이터가 너무 길면 파일로 전송
+          if (formattedData.length > 1900) {
+            const buffer = Buffer.from(formattedData, 'utf-8');
+            const attachment = new AttachmentBuilder(buffer, { name: `${dataType}_data.json` });
+            await message.reply({ 
+              content: `📊 ${selectedData.name} 데이터가 너무 커서 파일로 전송됩니다.`,
+              files: [attachment] 
+            });
+          } else {
+            await message.reply(`📊 ${selectedData.name} 데이터:\n\`\`\`json\n${formattedData}\n\`\`\``);
+          }
+          break;
+
+        case '초기화':
+          // 확인 메시지 전송
+          const confirmMsg = await message.reply(
+            `⚠️ 정말 ${selectedData.name} 데이터를 초기화하시겠습니까?\n` +
+            '계속하려면 30초 안에 "확인"을 입력하세요.'
+          );
+
+          try {
+            const filter = m => m.author.id === message.author.id && m.content === '확인';
+            await message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] });
+            
+            // 데이터 초기화
+            if (dataType === 'stats') {
+              userStats = { voiceTime: {}, messageCount: {} };
+              saveStats();
+            } else if (dataType === 'timeout') {
+              timeoutHistoryData = {};
+              saveTimeoutHistory();
+            } else if (dataType === 'valorant') {
+              valorantSettings = {};
+              saveValorantSettings();
+            }
+
+            await message.reply(`✅ ${selectedData.name} 데이터가 초기화되었습니다.`);
+          } catch (error) {
+            await message.reply('❌ 시간이 초과되었거나 작업이 취소되었습니다.');
+          }
+          break;
+
+        case '백업':
+          // 현재 데이터의 백업 파일 생성
+          const backupData = JSON.stringify(selectedData.data, null, 2);
+          const backupBuffer = Buffer.from(backupData, 'utf-8');
+          const backupAttachment = new AttachmentBuilder(backupBuffer, { 
+            name: `${dataType}_backup_${new Date().toISOString().slice(0,10)}.json` 
+          });
+          
+          await message.reply({ 
+            content: `📥 ${selectedData.name} 백업 파일이 생성되었습니다.`,
+            files: [backupAttachment] 
+          });
+          break;
+
+        case '수정':
+          // 첨부된 파일 확인
+          const attachment = message.attachments.first();
+          if (!attachment) {
+            return message.reply('❌ 수정할 데이터 파일을 첨부해주세요.');
+          }
+
+          try {
+            // 파일 다운로드 및 파싱
+            const response = await axios.get(attachment.url);
+            const newData = JSON.parse(JSON.stringify(response.data));
+
+            // 데이터 유효성 검사
+            if (dataType === 'stats') {
+              if (!newData.voiceTime || !newData.messageCount) {
+                throw new Error('올바르지 않은 통계 데이터 형식입니다.');
+              }
+            } else if (dataType === 'timeout') {
+              // timeoutHistory 형식 검사
+              Object.values(newData).forEach(user => {
+                if (!user.username || !Array.isArray(user.timeouts)) {
+                  throw new Error('올바르지 않은 타임아웃 데이터 형식입니다.');
+                }
+              });
+            } else if (dataType === 'valorant') {
+              // valorantSettings 형식 검사
+              Object.values(newData).forEach(account => {
+                if (!account.valorantName || !account.valorantTag) {
+                  throw new Error('올바르지 않은 발로란트 설정 형식입니다.');
+                }
+              });
+            }
+
+            // 확인 메시지 전송
+            const confirmMsg = await message.reply(
+              `⚠️ 정말 ${selectedData.name} 데이터를 수정하시겠습니까?\n` +
+              '계속하려면 30초 안에 "확인"을 입력하세요.'
+            );
+
+            const filter = m => m.author.id === message.author.id && m.content === '확인';
+            await message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] });
+
+            // 데이터 업데이트
+            if (dataType === 'stats') {
+              userStats = newData;
+              saveStats();
+            } else if (dataType === 'timeout') {
+              timeoutHistoryData = newData;
+              saveTimeoutHistory();
+            } else if (dataType === 'valorant') {
+              valorantSettings = newData;
+              saveValorantSettings();
+            }
+
+            await message.reply(`✅ ${selectedData.name} 데이터가 성공적으로 수정되었습니다.`);
+
+          } catch (error) {
+            console.error('데이터 수정 중 오류:', error);
+            message.reply(`❌ 데이터 수정 중 오류가 발생했습니다: ${error.message}`);
+          }
+          break;
+
+        default:
+          message.reply('❌ 올바른 하위 명령어가 아닙니다. (보기/초기화/백업/수정)');
+      }
+    } catch (error) {
+      console.error('데이터 관리 중 오류:', error);
+      message.reply('❌ 데이터 처리 중 오류가 발생했습니다.');
+    }
+  }
+
+  
 });
 
 // 타임아웃 감지
@@ -3060,28 +3352,7 @@ function cleanupQueue(queue) {
   queues.delete(queue.guildId);
 }
 
-// play-dl 초기화 함수 수정
-async function initializePlayDL() {
-  try {
-    await play.setToken({
-      youtube: {
-        cookie: 'CONSENT=YES+1; SOCS=CAISEwgDEgk0ODE4MjkyMTEaAmtvIAEaBgiAysTqBg; VISITOR_INFO1_LIVE=U_eaB8_V8qs; YSC=79QF2uN5Q8E; wide=1; __Secure-YEC=CgtVX2VhQjhfVjhxcyiomPmqBg%3D%3D',
-        id: '4818292115',
-        bl: 's',
-        gl: 'KR',
-        // 요청 간격 설정
-        requestOptions: {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
-        }
-      }
-    });
-    console.log('play-dl 초기화 완료');
-  } catch (error) {
-    console.error('play-dl 초기화 실패:', error);
-  }
-}
+
 
 // 봇 시작 시 초기화 실행
 client.once('ready', async () => {
@@ -3568,10 +3839,13 @@ async function compareStats(player1, player2) {
       let totalDeaths = 0;
       let totalAssists = 0;
       let totalScore = 0;
-      let wins = 0;
       let totalHeadshots = 0;
       let totalBodyshots = 0;
       let totalLegshots = 0;
+      let totalRounds = 0;
+      let wins = 0;
+      let mostUsedAgent = {};
+      let agentStats = {};
 
       matches.forEach(match => {
         const player = match.players.all_players.find(p => 
@@ -3579,54 +3853,226 @@ async function compareStats(player1, player2) {
           p.tag.toLowerCase() === stats.account.tag.toLowerCase()
         );
         
-        totalKills += player.stats.kills;
-        totalDeaths += player.stats.deaths;
-        totalAssists += player.stats.assists;
-        totalScore += player.stats.score;
-        if (match.teams.blue.has_won) wins++;
+        // 기본 통계
+        totalKills += player.stats.kills || 0;
+        totalDeaths += player.stats.deaths || 0;
+        totalAssists += player.stats.assists || 0;
+        totalScore += player.stats.score || 0;
+        totalRounds += match.metadata.rounds_played || 0;
         
-        // 헤드샷 등 정확도 통계
-        player.stats.headshots = player.stats.headshots || 0;
-        player.stats.bodyshots = player.stats.bodyshots || 0;
-        player.stats.legshots = player.stats.legshots || 0;
-        totalHeadshots += player.stats.headshots;
-        totalBodyshots += player.stats.bodyshots;
-        totalLegshots += player.stats.legshots;
+        // 승리 카운트
+        if (match.teams[player.team.toLowerCase()]?.has_won) wins++;
+
+        // 정확도 통계
+        totalHeadshots += player.stats.headshots || 0;
+        totalBodyshots += player.stats.bodyshots || 0;
+        totalLegshots += player.stats.legshots || 0;
+
+        // 에이전트 사용 통계
+        const agent = player.character;
+        if (!agentStats[agent]) {
+          agentStats[agent] = {
+            matches: 0,
+            kills: 0,
+            deaths: 0,
+            assists: 0
+          };
+        }
+        agentStats[agent].matches++;
+        agentStats[agent].kills += player.stats.kills || 0;
+        agentStats[agent].deaths += player.stats.deaths || 0;
+        agentStats[agent].assists += player.stats.assists || 0;
       });
+
+      // 가장 많이 사용한 에이전트 찾기
+      mostUsedAgent = Object.entries(agentStats)
+        .sort((a, b) => b[1].matches - a[1].matches)[0];
 
       const totalShots = totalHeadshots + totalBodyshots + totalLegshots;
 
       return {
-        currentTier: stats.mmr.current_data.currenttierpatched,
-        currentRR: stats.mmr.current_data.ranking_in_tier,
+        currentTier: stats.mmr.current_data.currenttierpatched || 'Unranked',
+        peakTier: stats.mmr.highest_rank?.patched_tier || 'Unranked',
+        currentRR: stats.mmr.current_data.ranking_in_tier || 0,
+        level: stats.account.account_level,
+        matches: matches.length,
         winRate: ((wins / matches.length) * 100).toFixed(1),
         kda: ((totalKills + totalAssists) / Math.max(totalDeaths, 1)).toFixed(2),
+        kd: (totalKills / Math.max(totalDeaths, 1)).toFixed(2),
         averageScore: Math.round(totalScore / matches.length),
         averageKills: (totalKills / matches.length).toFixed(1),
         averageDeaths: (totalDeaths / matches.length).toFixed(1),
         averageAssists: (totalAssists / matches.length).toFixed(1),
-        headshotPercentage: totalShots > 0 ? ((totalHeadshots / totalShots) * 100).toFixed(1) : '0.0'
+        headshotPercentage: totalShots > 0 ? ((totalHeadshots / totalShots) * 100).toFixed(1) : '0.0',
+        averageCombatScore: Math.round(totalScore / totalRounds),
+        mostUsedAgent: {
+          name: mostUsedAgent[0],
+          matches: mostUsedAgent[1].matches,
+          kda: ((mostUsedAgent[1].kills + mostUsedAgent[1].assists) / Math.max(mostUsedAgent[1].deaths, 1)).toFixed(2)
+        }
       };
     };
 
-    return {
-      player1: {
-        name: player1.name,
-        tag: player1.tag,
-        stats: calculatePlayerStats(stats1),
-        card: stats1.account.card.small
-      },
-      player2: {
-        name: player2.name,
-        tag: player2.tag,
-        stats: calculatePlayerStats(stats2),
-        card: stats2.account.card.small
+    const player1Stats = calculatePlayerStats(stats1);
+    const player2Stats = calculatePlayerStats(stats2);
+
+    // 비교 결과 임베드 수정 - 이모지와 색상으로 비교 표시
+    const compareValues = (val1, val2, higherIsBetter = true, format = 'number') => {
+      if (format === 'tier') {
+        // 언랭크 처리
+        if (val1 === 'Unranked' && val2 === 'Unranked') {
+          return `${val1} ⚔️ ${val2}`;
+        }
+        if (val1 === 'Unranked') {
+          return `${val1} ❄️ **${val2}**`;
+        }
+        if (val2 === 'Unranked') {
+          return `**${val1}** 🔥 ${val2}`;
+        }
+
+        const tier1 = val1.split(' ')[0];
+        const tier2 = val2.split(' ')[0];
+        const rank1 = TIER_RANKS[tier1] || -1;
+        const rank2 = TIER_RANKS[tier2] || -1;
+        
+        if (rank1 === rank2) return `${val1} ⚔️ ${val2}`;
+        if (rank1 > rank2) {
+          return `**${val1}** 🔥 ${val2}`;
+        } else {
+          return `${val1} ❄️ **${val2}**`;
+        }
+      }
+
+      const v1 = parseFloat(val1);
+      const v2 = parseFloat(val2);
+      const diff = v1 - v2;
+      
+      let value1 = format === 'percent' ? `${val1}%` : val1;
+      let value2 = format === 'percent' ? `${val2}%` : val2;
+      
+      if (Math.abs(diff) < 0.01) return `${value1} ⚔️ ${value2}`;
+      
+      if ((diff > 0) === higherIsBetter) {
+        return `**${value1}** 🔥 ${value2}`;
+      } else {
+        return `${value1} ❄️ **${value2}**`;
       }
     };
+
+    const embed = {
+      color: 0xFF4654,
+      title: '🆚 플레이어 통계 비교',
+      description: '🔥 더 좋음 | ❄️ 더 낮음 | ⚔️ 비슷함\n최근 20경기 기준',  // 기준 추가
+      fields: [
+        {
+          name: '기본 정보',
+          value: 
+            `**${player1.name}#${player1.tag}** vs **${player2.name}#${player2.tag}**\n` +
+            `레벨: ${compareValues(player1Stats.level, player2Stats.level)}\n` +
+            `현재 티어: ${compareValues(player1Stats.currentTier, player2Stats.currentTier, true, 'tier')}\n` +
+            `최고 티어: ${compareValues(player1Stats.peakTier, player2Stats.peakTier, true, 'tier')}\n` +
+            `현재 RR: ${compareValues(player1Stats.currentRR, player2Stats.currentRR)}\n`,
+          inline: false
+        },
+        {
+          name: '매치 통계',
+          value: 
+            `분석된 매치: ${player1Stats.matches}경기 vs ${player2Stats.matches}경기\n` +
+            `승률: ${compareValues(player1Stats.winRate, player2Stats.winRate, true, 'percent')}\n` +
+            `KDA: ${compareValues(player1Stats.kda, player2Stats.kda)}\n` +
+            `K/D: ${compareValues(player1Stats.kd, player2Stats.kd)}`,
+          inline: false
+        },
+        {
+          name: '평균 통계 (매치당)',  // 이름 수정
+          value: 
+            `킬: ${compareValues(player1Stats.averageKills, player2Stats.averageKills)}\n` +
+            `데스: ${compareValues(player1Stats.averageDeaths, player2Stats.averageDeaths, false)}\n` +
+            `어시: ${compareValues(player1Stats.averageAssists, player2Stats.averageAssists)}\n` +
+            `전투 점수: ${compareValues(player1Stats.averageCombatScore, player2Stats.averageCombatScore)}`,
+          inline: false
+        },
+        {
+          name: '정확도 통계',
+          value: 
+            `헤드샷: ${compareValues(player1Stats.headshotPercentage, player2Stats.headshotPercentage, true, 'percent')}`,
+          inline: false
+        },
+        {
+          name: '주요 에이전트',
+          value: 
+            `${player1Stats.mostUsedAgent.name} (${player1Stats.mostUsedAgent.matches}경기, KDA ${player1Stats.mostUsedAgent.kda})\n` +
+            `${player2Stats.mostUsedAgent.name} (${player2Stats.mostUsedAgent.matches}경기, KDA ${player2Stats.mostUsedAgent.kda})`,
+          inline: false
+        }
+      ],
+      timestamp: new Date()
+    };
+
+    return { embed };
   } catch (error) {
     console.error('플레이어 비교 실패:', error);
     throw error;
   }
 }
+
+// 티어 순위 매핑 수정
+const TIER_RANKS = {
+  'Unranked': -1,  // 언랭크 추가
+  'Iron': 0,
+  'Bronze': 1,
+  'Silver': 2,
+  'Gold': 3,
+  'Platinum': 4,
+  'Diamond': 5,
+  'Ascendant': 6,
+  'Immortal': 7,
+  'Radiant': 8
+};
+
+// compareValues 함수의 티어 비교 로직 수정
+const compareValues = (val1, val2, higherIsBetter = true, format = 'number') => {
+  if (format === 'tier') {
+    // 언랭크 처리
+    if (val1 === 'Unranked' && val2 === 'Unranked') {
+      return `${val1} ⚔️ ${val2}`;
+    }
+    if (val1 === 'Unranked') {
+      return `${val1} ❄️ **${val2}**`;
+    }
+    if (val2 === 'Unranked') {
+      return `**${val1}** 🔥 ${val2}`;
+    }
+
+    const tier1 = val1.split(' ')[0];
+    const tier2 = val2.split(' ')[0];
+    const rank1 = TIER_RANKS[tier1] || -1;
+    const rank2 = TIER_RANKS[tier2] || -1;
+    
+    if (rank1 === rank2) return `${val1} ⚔️ ${val2}`;
+    if (rank1 > rank2) {
+      return `**${val1}** 🔥 ${val2}`;
+    } else {
+      return `${val1} ❄️ **${val2}**`;
+    }
+  }
+
+  const v1 = parseFloat(val1);
+  const v2 = parseFloat(val2);
+  const diff = v1 - v2;
+  
+  let value1 = format === 'percent' ? `${val1}%` : val1;
+  let value2 = format === 'percent' ? `${val2}%` : val2;
+  
+  if (Math.abs(diff) < 0.01) return `${value1} ⚔️ ${value2}`;
+  
+  if ((diff > 0) === higherIsBetter) {
+    return `**${value1}** 🔥 ${value2}`;
+  } else {
+    return `${value1} ❄️ **${value2}**`;
+  }
+};
+
+
 
 client.login(process.env.DISCORD_TOKEN);
