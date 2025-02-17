@@ -290,15 +290,6 @@ const VOLUME_SETTINGS_FILE = './volumeSettings.json';
 
 
 // 볼륨 설정 저장 함수 수정
-async function saveVolumeSettings() {
-  try {
-    const settings = Object.fromEntries(volumeSettings);
-    await setDoc(doc(db, 'settings', 'volume'), settings);
-    console.log('볼륨 설정 저장 완료');
-  } catch (error) {
-    console.error('볼륨 설정 저장 중 오류 발생:', error);
-  }
-}
 
 // 봇 시작 시 볼륨 설정 로드 추가
 client.once('ready', async () => {
