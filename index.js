@@ -4329,7 +4329,8 @@ async function processTTSQueue(guildId) {
     // 재생 완료 대기
     await new Promise((resolve, reject) => {
       const resource = createAudioResource(tempFile, {
-        inlineVolume: true
+        inlineVolume: true,
+        inputType: StreamType.Arbitrary  // 이 부분 추가
       });
       resource.volume.setVolume(0.8);
 
@@ -4352,10 +4353,17 @@ async function processTTSQueue(guildId) {
         reject(error);
       });
 
+      // 디버그 로그 추가
+      console.log('재생 시작:', tempFile);
+      player.on(AudioPlayerStatus.Playing, () => {
+        console.log('재생 중...');
+      });
+
       try {
         player.play(resource);
         connection.subscribe(player);
       } catch (error) {
+        console.error('재생 시작 실패:', error);
         reject(error);
       }
     });
