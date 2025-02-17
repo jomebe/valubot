@@ -4202,11 +4202,10 @@ async function processTTSQueue(guildId) {
         queue.items.shift();
         queue.isProcessing = false;
         processTTSQueue(guildId);
-        throw new Error('음성 채널 연결 실패');
+        return;
       }
     }
 
-    // TTS 생성 및 재생
     const tempFile = path.join(TEMP_DIR, `tts_${Date.now()}.mp3`);
     const url = `http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=${encodeURIComponent(item.text)}&tl=${item.language}`;
     
@@ -4219,37 +4218,40 @@ async function processTTSQueue(guildId) {
       }
     });
 
-    const resource = createAudioResource(tempFile, {
-      inlineVolume: true
-    });
-    resource.volume.setVolume(0.8);
+    // 재생 완료 처리를 Promise로 래핑
+    await new Promise((resolve, reject) => {
+      const resource = createAudioResource(tempFile, {
+        inlineVolume: true
+      });
+      resource.volume.setVolume(0.8);
 
-    // 재생 완료 후 다음 항목 처리
-    player.on(AudioPlayerStatus.Idle, () => {
-      try {
-        fs.unlinkSync(tempFile);
-      } catch (error) {
-        console.error('Temp file cleanup error:', error);
-      }
-      queue.items.shift();
-      queue.isProcessing = false;
-      processTTSQueue(guildId);
+      player.on(AudioPlayerStatus.Idle, () => {
+        try {
+          fs.unlinkSync(tempFile);
+        } catch (error) {
+          console.error('Temp file cleanup error:', error);
+        }
+        resolve();
+      });
+
+      player.on('error', error => {
+        console.error('Audio player error:', error);
+        try {
+          fs.unlinkSync(tempFile);
+        } catch (err) {
+          console.error('Temp file cleanup error:', err);
+        }
+        reject(error);
+      });
+
+      player.play(resource);
+      connection.subscribe(player);
     });
 
-    player.on('error', error => {
-      console.error('Audio player error:', error);
-      try {
-        fs.unlinkSync(tempFile);
-      } catch (err) {
-        console.error('Temp file cleanup error:', err);
-      }
-      queue.items.shift();
-      queue.isProcessing = false;
-      processTTSQueue(guildId);
-    });
-
-    player.play(resource);
-    connection.subscribe(player);
+    // 현재 항목 처리 완료 후 다음 항목으로
+    queue.items.shift();
+    queue.isProcessing = false;
+    processTTSQueue(guildId);
 
   } catch (error) {
     console.error('TTS 처리 중 오류:', error);
