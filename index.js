@@ -3051,7 +3051,42 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  
+  // TTS 처리
+  if (ttsSettings.get(message.author.id)?.enabled) {
+    const voiceChannel = message.member?.voice.channel;
+    if (!voiceChannel) {
+      return message.reply('❌ TTS를 사용하려면 음성 채널에 먼저 입장해주세요.');
+    }
+
+    try {
+      const settings = ttsSettings.get(message.author.id);
+      
+      // 서버의 TTS 큐 초기화 또는 가져오기
+      if (!ttsQueues.has(message.guildId)) {
+        ttsQueues.set(message.guildId, {
+          items: [],
+          isProcessing: false
+        });
+      }
+      
+      const queue = ttsQueues.get(message.guildId);
+      
+      // 큐에 새 메시지 추가
+      queue.items.push({
+        text: message.content,
+        language: settings.language,
+        voiceChannel: voiceChannel,
+        userId: message.author.id
+      });
+
+      // 큐 처리 시작
+      processTTSQueue(message.guildId);
+
+    } catch (error) {
+      console.error('TTS 큐 처리 중 오류:', error);
+      message.reply('❌ TTS 처리 중 오류가 발생했습니다.');
+    }
+  }
 });
 
 // 타임아웃 감지
@@ -4132,6 +4167,96 @@ const compareValues = (val1, val2, higherIsBetter = true, format = 'number') => 
   }
 };
 
+// TTS 큐 관리를 위한 Map 추가
+const ttsQueues = new Map();
 
+// TTS 큐 처리 함수
+async function processTTSQueue(guildId) {
+  const queue = ttsQueues.get(guildId);
+  if (!queue || queue.isProcessing || queue.items.length === 0) return;
+
+  queue.isProcessing = true;
+  const item = queue.items[0];
+
+  try {
+    let connection = getVoiceConnection(guildId);
+    
+    // 연결 상태 확인 및 재연결
+    if (!connection || connection.state.status !== 'ready' || connection.joinConfig.channelId !== item.voiceChannel.id) {
+      if (connection) {
+        connection.destroy();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      connection = joinVoiceChannel({
+        channelId: item.voiceChannel.id,
+        guildId: guildId,
+        adapterCreator: item.voiceChannel.guild.voiceAdapterCreator,
+        selfDeaf: false,
+        selfMute: false
+      });
+
+      try {
+        await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
+      } catch (error) {
+        queue.items.shift();
+        queue.isProcessing = false;
+        processTTSQueue(guildId);
+        throw new Error('음성 채널 연결 실패');
+      }
+    }
+
+    // TTS 생성 및 재생
+    const tempFile = path.join(TEMP_DIR, `tts_${Date.now()}.mp3`);
+    const url = `http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=${encodeURIComponent(item.text)}&tl=${item.language}`;
+    
+    const response = await axios.get(url, { responseType: 'arraybuffer' });
+    fs.writeFileSync(tempFile, response.data);
+
+    const player = createAudioPlayer({
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Play
+      }
+    });
+
+    const resource = createAudioResource(tempFile, {
+      inlineVolume: true
+    });
+    resource.volume.setVolume(0.8);
+
+    // 재생 완료 후 다음 항목 처리
+    player.on(AudioPlayerStatus.Idle, () => {
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (error) {
+        console.error('Temp file cleanup error:', error);
+      }
+      queue.items.shift();
+      queue.isProcessing = false;
+      processTTSQueue(guildId);
+    });
+
+    player.on('error', error => {
+      console.error('Audio player error:', error);
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (err) {
+        console.error('Temp file cleanup error:', err);
+      }
+      queue.items.shift();
+      queue.isProcessing = false;
+      processTTSQueue(guildId);
+    });
+
+    player.play(resource);
+    connection.subscribe(player);
+
+  } catch (error) {
+    console.error('TTS 처리 중 오류:', error);
+    queue.items.shift();
+    queue.isProcessing = false;
+    processTTSQueue(guildId);
+  }
+}
 
 client.login(process.env.DISCORD_TOKEN);
