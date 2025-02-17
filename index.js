@@ -2738,11 +2738,32 @@ client.on('messageCreate', async (message) => {
       // 현재 TTS 상태 확인
       const settings = ttsSettings.get(message.author.id);
       if (!settings) {
-        return message.reply('사용법:\nㅂtts O/X - TTS 켜기/끄기\nㅂtts언어 [ko/en/ja/ch/la] - 언어 변경\n현재 상태: OFF');
+        return message.reply('사용법:\nㅂtts O/X - TTS 켜기/끄기\nㅂtts언어 [ko/en/ja/ch/la] - 언어 변경\nㅂtts쉿 - TTS 큐 초기화\n현재 상태: OFF');
       }
       return message.reply(`현재 TTS 상태: ${settings.enabled ? 'ON' : 'OFF'}\n언어: ${settings.language}`);
     }
 
+    if (command === '쉿') {
+      // TTS 큐 초기화
+      const queue = ttsQueues.get(message.guildId);
+      if (queue) {
+        queue.items = [];  // 큐 비우기
+        queue.isProcessing = false;  // 처리 상태 초기화
+        
+        // 현재 재생 중인 연결도 정리
+        const connection = getVoiceConnection(message.guildId);
+        if (connection) {
+          connection.destroy();
+        }
+        
+        message.reply('✅ TTS 큐가 초기화되었습니다.');
+      } else {
+        message.reply('❌ 현재 실행 중인 TTS가 없습니다.');
+      }
+      return;
+    }
+
+    // 기존 O/X, 언어 변경 등의 명령어 처리...
     if (command.toUpperCase() === 'O' || command.toUpperCase() === 'X') {
       const isEnabled = command.toUpperCase() === 'O';
       const currentSettings = ttsSettings.get(message.author.id) || { language: 'ko' };
@@ -2773,7 +2794,7 @@ client.on('messageCreate', async (message) => {
       });
       message.reply(`✅ TTS 언어가 ${supportedLanguages[lang]}로 변경되었습니다.`);
     } else {
-      message.reply('❌ 올바른 형식이 아닙니다.\nㅂtts O/X - TTS 켜기/끄기\nㅂtts언어 [ko/en/ja/ch/la] - 언어 변경');
+      message.reply('❌ 올바른 형식이 아닙니다.\nㅂtts O/X - TTS 켜기/끄기\nㅂtts언어 [ko/en/ja/ch/la] - 언어 변경\nㅂtts쉿 - TTS 큐 초기화');
     }
   }
 
