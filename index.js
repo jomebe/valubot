@@ -20,6 +20,8 @@ const __dirname = dirname(__filename);
 
 // config.json 파일 import 수정
 
+
+const activeTimers = new Map();
 // TEMP_DIR 경로 설정 수정
 const TEMP_DIR = path.join(__dirname, 'temp');  // 현재 작업 디렉토리의 temp 폴더
 
@@ -109,7 +111,7 @@ const valorantMaps = [
   const ttsSettings = new Map();
 // 서버별 음악 큐와 볼륨을 저장할 Map 선언 부분 수정
 const queues = new Map();
-const volumeSettings = new Map();  // Map으로 변경
+let volumeSettings = new Map();  // let으로 변경
 
 // 선착순 대기열을 저장할 Map
 const waitingQueues = new Map();
@@ -122,18 +124,7 @@ const openai = new OpenAI({
 // 출석 데이터를 저장할 객체
 let attendanceData = {};
 
-// 파일에서 출석 데이터 로드
-try {
-  attendanceData = JSON.parse(fs.readFileSync('./attendance.json', 'utf8'));
-} catch (error) {
-  console.log('출석 데이터 파일이 없습니다. 새로 생성합니다.');
-  fs.writeFileSync('./attendance.json', JSON.stringify(attendanceData));
-}
 
-// 출석 데이터 저장 함수
-function saveAttendanceData() {
-  fs.writeFileSync('./attendance.json', JSON.stringify(attendanceData));
-}
 
 // 선착순 대기열 관리 함수들
 function createWaitingQueue(guildId, limit, message, isMentionEnabled) {
@@ -174,74 +165,14 @@ let userStats = {
   messageCount: {}
 };
 
-// 데이터 파일 경로
-const STATS_FILE = './userStats.json';
 
-// 데이터 로드 함수
-function loadStats() {
-  try {
-    const data = fs.readFileSync(STATS_FILE, 'utf8');
-    userStats = JSON.parse(data);
-    console.log('통계 데이터를 성공적으로 불러왔습니다.');
-  } catch (error) {
-    console.log('통계 데이터 파일이 없습니다. 새로 생성합니다.');
-    userStats = {
-      voiceTime: {},
-      messageCount: {}
-    };
-    saveStats();
-  }
-}
 
-// 데이터 저장 함수
-function saveStats() {
-  try {
-    fs.writeFileSync(
-      STATS_FILE,
-      JSON.stringify(userStats, null, 2)
-    );
-    console.log('통계 데이터 저장 완료');
-  } catch (error) {
-    console.error('통계 데이터 저장 중 오류 발생:', error);
-  }
-}
-
-// 파일 상단에 추가
-const VALORANT_SETTINGS_FILE = './valorantSettings.json';
 
 // 발로란트 설정을 저장할 객체
 let valorantSettings = {};
 
-// 발로란트 설정 로드 함수 수정
-function loadValorantSettings() {
-  try {
-    const data = fs.readFileSync(VALORANT_SETTINGS_FILE, 'utf8');
-    valorantSettings = JSON.parse(data);
-    console.log('발로란트 설정을 성공적으로 불러왔습니다.');
-    console.log('등록된 계정 수:', Object.keys(valorantSettings).length);
-  } catch (error) {
-    console.log('발로란트 설정 파일이 없습니다. 새로 생성합니다.');
-    valorantSettings = {};
-    saveValorantSettings();
-  }
-}
 
-// 발로란트 설정 저장 함수 수정
-function saveValorantSettings() {
-  try {
-    // 저장 전 데이터 확인
-    console.log('저장할 계정 수:', Object.keys(valorantSettings).length);
-    console.log('저장할 데이터:', valorantSettings);
-    
-    fs.writeFileSync(
-      VALORANT_SETTINGS_FILE, 
-      JSON.stringify(valorantSettings, null, 2)
-    );
-    console.log('발로란트 설정 저장 완료');
-  } catch (error) {
-    console.error('발로란트 설정 저장 중 오류 발생:', error);
-  }
-}
+
 
 // 티어별 역할 ID 매핑
 const TIER_ROLE_IDS = {
@@ -348,52 +279,38 @@ const TIMEOUT_HISTORY_FILE = './timeoutHistory.json';
 // 타임아웃 기록을 저장할 객체
 let timeoutHistoryData = {};
 
-// 타임아웃 기록 로드 함수
-function loadTimeoutHistory() {
-  try {
-    const data = fs.readFileSync(TIMEOUT_HISTORY_FILE, 'utf8');
-    timeoutHistoryData = JSON.parse(data);
-    console.log('타임아웃 기록을 성공적으로 불러왔습니다.');
-  } catch (error) {
-    console.log('타임아웃 기록 파일이 없습니다. 새로 생성합니다.');
-    saveTimeoutHistory();
-  }
-}
 
-// 타임아웃 기록 저장 함수
-function saveTimeoutHistory() {
-  try {
-    fs.writeFileSync(TIMEOUT_HISTORY_FILE, JSON.stringify(timeoutHistoryData, null, 2));
-  } catch (error) {
-    console.error('타임아웃 기록 저장 중 오류 발생:', error);
-  }
-}
+
+
 
 // 볼륨 설정 파일 경로
 const VOLUME_SETTINGS_FILE = './volumeSettings.json';
 
 
 // 볼륨 설정 로드 함수 수정
-function loadVolumeSettings() {
+async function loadVolumeSettings() {
   try {
-    const data = fs.readFileSync(VOLUME_SETTINGS_FILE, 'utf8');
-    const settings = JSON.parse(data);
-    // JSON 데이터를 Map으로 변환
-    Object.entries(settings).forEach(([guildId, volume]) => {
-      volumeSettings.set(guildId, volume);
-    });
-    console.log('볼륨 설정을 성공적으로 불러왔습니다.');
+    const docSnap = await getDoc(doc(db, 'settings', 'volume'));
+    if (docSnap.exists()) {
+      const settings = docSnap.data();
+      volumeSettings = new Map(Object.entries(settings));
+      console.log('볼륨 설정을 성공적으로 불러왔습니다.');
+    } else {
+      volumeSettings = new Map();
+      console.log('볼륨 설정이 없어 새로 생성합니다.');
+    }
   } catch (error) {
-    console.log('볼륨 설정 파일이 없습니다. 기본값을 사용합니다.');
+    console.error('볼륨 설정 로드 실패:', error);
+    volumeSettings = new Map();
   }
 }
 
 // 볼륨 설정 저장 함수 수정
-function saveVolumeSettings() {
+async function saveVolumeSettings() {
   try {
-    // Map을 객체로 변환하여 저장
     const settings = Object.fromEntries(volumeSettings);
-    fs.writeFileSync(VOLUME_SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    await setDoc(doc(db, 'settings', 'volume'), settings);
+    console.log('볼륨 설정 저장 완료');
   } catch (error) {
     console.error('볼륨 설정 저장 중 오류 발생:', error);
   }
@@ -402,11 +319,17 @@ function saveVolumeSettings() {
 // 봇 시작 시 볼륨 설정 로드 추가
 client.once('ready', async () => {
   console.log(`로그인 완료: ${client.user.tag}`);
-  // loadVolumeSettings();  // 볼륨 설정 로드
-  // await initializePlayDL();  // play-dl 초기화
-  // console.log('play-dl 초기화 완료');
-  loadStats();  // 통계 데이터 로드
-  loadValorantSettings();  // 기존 발로란트 설정 로드
+  
+  // 모든 데이터 로드
+  await Promise.all([
+    loadStats(),
+    loadValorantSettings(),
+    loadTimeoutHistory(),
+    loadVoiceLog(),
+    loadVolumeSettings()  // 볼륨 설정 로드 추가
+  ]);
+  
+  console.log('초기화 완료');
 });
 
 // 초성 매핑 (기본 명령어)
@@ -2001,12 +1924,12 @@ client.on('messageCreate', async (message) => {
       const newSettings = {
         ...valorantSettings,  // 기존 데이터 유지
         [discordId]: {       // 새 데이터 추가
-          discordTag: message.author.tag,
-          valorantName: name,
-          valorantTag: tag,
-          region: region,
-          puuid: accountData.puuid,
-          updatedAt: new Date().toISOString()
+        discordTag: message.author.tag,
+        valorantName: name,
+        valorantTag: tag,
+        region: region,
+        puuid: accountData.puuid,
+        updatedAt: new Date().toISOString()
         }
       };
       
@@ -2908,22 +2831,25 @@ client.on('messageCreate', async (message) => {
 
     const dataTypes = {
       'timeout': {
-        file: './timeoutHistory.json',
         name: '타임아웃 기록',
         data: timeoutHistoryData,
-        save: saveTimeoutHistory
+        save: saveTimeoutHistory,
+        collection: 'history',
+        document: 'timeout'
       },
       'stats': {
-        file: './userStats.json',
         name: '사용자 통계',
         data: userStats,
-        save: saveStats
+        save: saveStats,
+        collection: 'stats',
+        document: 'user'
       },
       'valorant': {
-        file: './valorantSettings.json',
         name: '발로란트 설정',
         data: valorantSettings,
-        save: saveValorantSettings
+        save: saveValorantSettings,
+        collection: 'settings',
+        document: 'valorant'
       }
     };
 
@@ -2932,7 +2858,7 @@ client.on('messageCreate', async (message) => {
         '사용법:\n' +
         'ㅂ데이터 보기 [timeout/stats/valorant] - 데이터 확인\n' +
         'ㅂ데이터 초기화 [timeout/stats/valorant] - 데이터 초기화\n' +
-        'ㅂ데이터 백업 [timeout/stats/valorant] - 데이터 백업 파일 받기\n' +
+        'ㅂ데이터 백업 [timeout/stats/valorant] - 데이터 백업 받기\n' +
         'ㅂ데이터 수정 [timeout/stats/valorant] - 데이터 수정'
       );
     }
@@ -2942,133 +2868,54 @@ client.on('messageCreate', async (message) => {
     try {
       switch (subCommand) {
         case '보기':
-          // 데이터를 보기 좋게 포맷팅
-          const formattedData = JSON.stringify(selectedData.data, null, 2);
-          
-          // 데이터가 너무 길면 파일로 전송
-          if (formattedData.length > 1900) {
-            const buffer = Buffer.from(formattedData, 'utf-8');
-            const attachment = new AttachmentBuilder(buffer, { name: `${dataType}_data.json` });
-            await message.reply({ 
-              content: `📊 ${selectedData.name} 데이터가 너무 커서 파일로 전송됩니다.`,
-              files: [attachment] 
-            });
+          const docSnap = await getDoc(doc(db, selectedData.collection, selectedData.document));
+          if (docSnap.exists()) {
+            const formattedData = JSON.stringify(docSnap.data(), null, 2);
+            if (formattedData.length > 1900) {
+              const buffer = Buffer.from(formattedData, 'utf-8');
+              const attachment = new AttachmentBuilder(buffer, { name: `${dataType}_data.json` });
+              await message.reply({ 
+                content: `📊 ${selectedData.name} 데이터가 너무 커서 파일로 전송됩니다.`,
+                files: [attachment] 
+              });
+            } else {
+              await message.reply(`📊 ${selectedData.name} 데이터:\n\`\`\`json\n${formattedData}\n\`\`\``);
+            }
           } else {
-            await message.reply(`📊 ${selectedData.name} 데이터:\n\`\`\`json\n${formattedData}\n\`\`\``);
+            await message.reply(`❌ ${selectedData.name} 데이터가 없습니다.`);
           }
           break;
 
         case '초기화':
-          // 확인 메시지 전송
-          const confirmMsg = await message.reply(
-            `⚠️ 정말 ${selectedData.name} 데이터를 초기화하시겠습니까?\n` +
-            '계속하려면 30초 안에 "확인"을 입력하세요.'
-          );
-
-          try {
-            const filter = m => m.author.id === message.author.id && m.content === '확인';
-            await message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] });
-            
-            // 데이터 초기화
-            if (dataType === 'stats') {
-              userStats = { voiceTime: {}, messageCount: {} };
-              saveStats();
-            } else if (dataType === 'timeout') {
-              timeoutHistoryData = {};
-              saveTimeoutHistory();
-            } else if (dataType === 'valorant') {
-              valorantSettings = {};
-              saveValorantSettings();
-            }
-
-            await message.reply(`✅ ${selectedData.name} 데이터가 초기화되었습니다.`);
-          } catch (error) {
-            await message.reply('❌ 시간이 초과되었거나 작업이 취소되었습니다.');
-          }
+          const defaultData = dataType === 'stats' ? { voiceTime: {}, messageCount: {} } : {};
+          await setDoc(doc(db, selectedData.collection, selectedData.document), defaultData);
+          selectedData.data = defaultData;
+          await message.reply(`✅ ${selectedData.name}가 초기화되었습니다.`);
           break;
 
         case '백업':
-          // 현재 데이터의 백업 파일 생성
-          const backupData = JSON.stringify(selectedData.data, null, 2);
-          const backupBuffer = Buffer.from(backupData, 'utf-8');
-          const backupAttachment = new AttachmentBuilder(backupBuffer, { 
-            name: `${dataType}_backup_${new Date().toISOString().slice(0,10)}.json` 
-          });
-          
-          await message.reply({ 
-            content: `📥 ${selectedData.name} 백업 파일이 생성되었습니다.`,
-            files: [backupAttachment] 
-          });
+          const backupSnap = await getDoc(doc(db, selectedData.collection, selectedData.document));
+          if (backupSnap.exists()) {
+            const backupData = JSON.stringify(backupSnap.data(), null, 2);
+            const buffer = Buffer.from(backupData, 'utf-8');
+            const attachment = new AttachmentBuilder(buffer, { name: `${dataType}_backup.json` });
+            await message.reply({ 
+              content: `📥 ${selectedData.name} 백업 파일이 생성되었습니다.`,
+              files: [attachment] 
+            });
+          } else {
+            await message.reply(`❌ ${selectedData.name} 데이터가 없습니다.`);
+          }
           break;
 
         case '수정':
-          // 첨부된 파일 확인
-          const attachment = message.attachments.first();
-          if (!attachment) {
-            return message.reply('❌ 수정할 데이터 파일을 첨부해주세요.');
-          }
-
-          try {
-            // 파일 다운로드 및 파싱
-            const response = await axios.get(attachment.url);
-            const newData = JSON.parse(JSON.stringify(response.data));
-
-            // 데이터 유효성 검사
-            if (dataType === 'stats') {
-              if (!newData.voiceTime || !newData.messageCount) {
-                throw new Error('올바르지 않은 통계 데이터 형식입니다.');
-              }
-            } else if (dataType === 'timeout') {
-              // timeoutHistory 형식 검사
-              Object.values(newData).forEach(user => {
-                if (!user.username || !Array.isArray(user.timeouts)) {
-                  throw new Error('올바르지 않은 타임아웃 데이터 형식입니다.');
-                }
-              });
-            } else if (dataType === 'valorant') {
-              // valorantSettings 형식 검사
-              Object.values(newData).forEach(account => {
-                if (!account.valorantName || !account.valorantTag) {
-                  throw new Error('올바르지 않은 발로란트 설정 형식입니다.');
-                }
-              });
-            }
-
-            // 확인 메시지 전송
-            const confirmMsg = await message.reply(
-              `⚠️ 정말 ${selectedData.name} 데이터를 수정하시겠습니까?\n` +
-              '계속하려면 30초 안에 "확인"을 입력하세요.'
-            );
-
-            const filter = m => m.author.id === message.author.id && m.content === '확인';
-            await message.channel.awaitMessages({ filter, max: 1, time: 30000, errors: ['time'] });
-
-            // 데이터 업데이트
-            if (dataType === 'stats') {
-              userStats = newData;
-              saveStats();
-            } else if (dataType === 'timeout') {
-              timeoutHistoryData = newData;
-              saveTimeoutHistory();
-            } else if (dataType === 'valorant') {
-              valorantSettings = newData;
-              saveValorantSettings();
-            }
-
-            await message.reply(`✅ ${selectedData.name} 데이터가 성공적으로 수정되었습니다.`);
-
-          } catch (error) {
-            console.error('데이터 수정 중 오류:', error);
-            message.reply(`❌ 데이터 수정 중 오류가 발생했습니다: ${error.message}`);
-          }
+          // 수정 기능은 보안상의 이유로 제한적으로 구현
+          await message.reply('❌ 데이터 수정은 관리자에게 문의해주세요.');
           break;
-
-        default:
-          message.reply('❌ 올바른 하위 명령어가 아닙니다. (보기/초기화/백업/수정)');
       }
     } catch (error) {
-      console.error('데이터 관리 중 오류:', error);
-      message.reply('❌ 데이터 처리 중 오류가 발생했습니다.');
+      console.error(`데이터 처리 중 오류 발생:`, error);
+      await message.reply('❌ 데이터 처리 중 오류가 발생했습니다.');
     }
   }
 });
@@ -3119,47 +2966,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   if (newState.member.user.bot && newState.member.roles.cache.has('1135868235108065391')) {
     return;
   }
-
-  const logChannel = newState.guild.channels.cache.get(LOG_CHANNEL_ID);
-  if (!logChannel) return;
-
-  const userId = newState.member.id;
-
-  // 음성 채널 입장 시간 기록
-  if (!oldState.channelId && newState.channelId) {
-    voiceStartTimes.set(userId, Date.now());
-  }
-
-  // 음성 채널 퇴장 시 통화 시간 계산
-  if (oldState.channelId && !newState.channelId) {
-    const startTime = voiceStartTimes.get(userId);
-    if (startTime) {
-      const duration = Date.now() - startTime;
-      voiceStartTimes.delete(userId);
-      
-      // 통화 시간 통계 업데이트
-      if (!userStats.voiceTime) userStats.voiceTime = {};
-      userStats.voiceTime[userId] = (userStats.voiceTime[userId] || 0) + duration;
-      saveStats();
-    }
-  }
-
-    const currentTime = new Date().toLocaleTimeString('ko-KR', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-
-  if (!oldState.channelId && newState.channelId) {
-    logChannel.send(`[${currentTime}] 🎙️ ${newState.member.displayName}님이 ${newState.channel.name} 채널에 입장했습니다.`);
-  } else if (oldState.channelId && !newState.channelId) {
-    logChannel.send(`[${currentTime}] 🚪 ${oldState.member.displayName}님이 ${oldState.channel.name} 채널에서 퇴장했습니다.`);
-  } else if (oldState.channelId !== newState.channelId && oldState.channelId && newState.channelId) {
-    logChannel.send(`[${currentTime}] ↔️ ${newState.member.displayName}님이 ${oldState.channel.name} 채널에서 ${newState.channel.name} 채널로 이동했습니다.`);
-  }
-  
-  // ... 나머지 코드는 그대로 유지
+  // ... 나머지 음성 로그 코드
 });
 
 // 대기열 임베드 업데이트 함수 수정
@@ -3196,8 +3003,6 @@ function updateQueueEmbed(queue) {
   }
 }
 
-// 진행 중인 타이머를 저장할 Map
-const activeTimers = new Map();
 
 // 시간 포맷 함수
 function formatTime(ms) {
@@ -3312,7 +3117,7 @@ async function playNext(guildId, textChannel) {
 
   if (!queue.songs.length) {
     console.log('큐가 비어있어 재생 종료');
-    queue.playing = false;
+      queue.playing = false;
     try {
       cleanupQueue(queue);
       return textChannel.send('🎵 재생목록이 끝났습니다.');
@@ -3365,16 +3170,16 @@ async function playNext(guildId, textChannel) {
 
     queue.player.once(AudioPlayerStatus.Idle, () => {
       console.log('5. 노래 종료, 다음 곡으로');
-      queue.songs.shift();
-      playNext(guildId, textChannel);
-    });
+        queue.songs.shift();
+        playNext(guildId, textChannel);
+      });
 
   } catch (error) {
     console.error('재생 중 오류:', error);
     await textChannel.send(`❌ 재생 오류: ${error.message}`);
-    queue.songs.shift();
-    playNext(guildId, textChannel);
-  }
+          queue.songs.shift();
+          playNext(guildId, textChannel);
+        }
 }
 
 // 다운로드 확인 및 대기 함수 추가
@@ -3405,7 +3210,7 @@ async function ensureDownloaded(song, textChannel) {
     if (progressMsg) {
       try {
         await progressMsg.delete();
-      } catch (error) {
+  } catch (error) {
         console.error('진행 메시지 삭제 실패:', error);
       }
     }
@@ -3534,7 +3339,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
           title: song.title
         });
         console.log(`기존 파일 사용: ${song.title}`);
-        return;
+      return;
       }
     } catch (error) {
       try {
@@ -3548,7 +3353,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
   try {
     console.log(`다운로드 시작: ${song.title}`);
     const progressMsg = await message.channel.send(`⏳ **${song.title}** 다운로드 중... (취소하려면 '취소' 입력)`);
-    
+
     downloadQueue.set(song.url, {
       status: 'downloading',
       filePath: filePath,
@@ -3577,7 +3382,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
           if (fs.existsSync(filePath)) {
             try {
               const buffer = fs.readFileSync(filePath);
-              const duration = getMP3Duration(buffer);
+            const duration = getMP3Duration(buffer);
               if (duration > 0) {
                 downloadQueue.set(song.url, {
                   status: 'completed',
@@ -3632,7 +3437,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
       collector.stop();
     }
 
-  } catch (error) {
+      } catch (error) {
     if (error.message === 'Download cancelled by user' || isCancelled) {
       return;  // 취소된 경우 조용히 반환
     }
@@ -3658,29 +3463,11 @@ function createProgressBar(progress) {
   return '▰'.repeat(filledLength) + '▱'.repeat(emptyLength);
 }
 
-// 파일 상단에 추가
-const VOICE_LOG_FILE = './voiceLog.json';
 let voiceLogData = {};
 
-// 음성 로그 데이터 로드 함수
-function loadVoiceLog() {
-  try {
-    voiceLogData = JSON.parse(fs.readFileSync(VOICE_LOG_FILE, 'utf8'));
-    console.log('음성 로그를 성공적으로 불러왔습니다.');
-  } catch (error) {
-    console.log('음성 로그 파일이 없습니다. 새로 생성합니다.');
-    saveVoiceLog();
-  }
-}
 
-// 음성 로그 저장 함수
-function saveVoiceLog() {
-  try {
-    fs.writeFileSync(VOICE_LOG_FILE, JSON.stringify(voiceLogData, null, 2));
-  } catch (error) {
-    console.error('음성 로그 저장 중 오류 발생:', error);
-  }
-}
+
+
 
 // 5분마다 로그 초기화
 setInterval(() => {
@@ -4253,12 +4040,12 @@ async function processTTSQueue(guildId) {
       console.log('재생 시작:', tempFile);
       player.on(AudioPlayerStatus.Playing, () => {
         console.log('재생 중...');
-      });
+    });
 
       try {
         player.play(resource);
         connection.subscribe(player);
-      } catch (error) {
+  } catch (error) {
         console.error('재생 시작 실패:', error);
         reject(error);
       }
@@ -4283,5 +4070,281 @@ async function processTTSQueue(guildId) {
     }
   }
 }
+
+// Firebase 관련 import 추가
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, getDocs } from 'firebase/firestore';
+
+// Firebase 설정
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
+};
+
+// Firebase 초기화
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// 데이터 저장 함수들
+async function saveValorantSettings() {
+  try {
+    await setDoc(doc(db, 'settings', 'valorant'), valorantSettings);
+    console.log('발로란트 설정 저장 완료');
+  } catch (error) {
+    console.error('발로란트 설정 저장 실패:', error);
+  }
+}
+
+async function saveStats() {
+  try {
+    await setDoc(doc(db, 'stats', 'user'), userStats);
+    console.log('통계 데이터 저장 완료');
+  } catch (error) {
+    console.error('통계 데이터 저장 실패:', error);
+  }
+}
+
+async function saveTimeoutHistory() {
+  try {
+    await setDoc(doc(db, 'history', 'timeout'), timeoutHistoryData);
+    console.log('타임아웃 기록 저장 완료');
+  } catch (error) {
+    console.error('타임아웃 기록 저장 실패:', error);
+  }
+}
+
+async function saveVoiceLog() {
+  try {
+    await setDoc(doc(db, 'logs', 'voice'), voiceLogData);
+    console.log('음성 로그 저장 완료');
+  } catch (error) {
+    console.error('음성 로그 저장 실패:', error);
+  }
+}
+
+// 데이터 로드 함수들
+async function loadValorantSettings() {
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'valorant'));
+    if (docSnap.exists()) {
+      valorantSettings = docSnap.data();
+      console.log('발로란트 설정을 성공적으로 불러왔습니다.');
+    } else {
+      valorantSettings = {};
+      console.log('발로란트 설정이 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('발로란트 설정 로드 실패:', error);
+    valorantSettings = {};
+  }
+}
+
+async function loadStats() {
+  try {
+    const docSnap = await getDoc(doc(db, 'stats', 'user'));
+    if (docSnap.exists()) {
+      userStats = docSnap.data();
+      console.log('통계 데이터를 성공적으로 불러왔습니다.');
+    } else {
+      userStats = { voiceTime: {}, messageCount: {} };
+      console.log('통계 데이터가 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('통계 데이터 로드 실패:', error);
+    userStats = { voiceTime: {}, messageCount: {} };
+  }
+}
+
+async function loadTimeoutHistory() {
+  try {
+    const docSnap = await getDoc(doc(db, 'history', 'timeout'));
+    if (docSnap.exists()) {
+      timeoutHistoryData = docSnap.data();
+      console.log('타임아웃 기록을 성공적으로 불러왔습니다.');
+    } else {
+      timeoutHistoryData = {};
+      console.log('타임아웃 기록이 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('타임아웃 기록 로드 실패:', error);
+    timeoutHistoryData = {};
+  }
+}
+
+async function loadVoiceLog() {
+  try {
+    const docSnap = await getDoc(doc(db, 'logs', 'voice'));
+    if (docSnap.exists()) {
+      voiceLogData = docSnap.data();
+      console.log('음성 로그를 성공적으로 불러왔습니다.');
+    } else {
+      voiceLogData = {};
+      console.log('음성 로그가 없어 새로 생성합니다.');
+    }
+  } catch (error) {
+    console.error('음성 로그 로드 실패:', error);
+    voiceLogData = {};
+  }
+}
+
+// 봇 시작 시 초기화 수정
+client.once('ready', async () => {
+  console.log(`로그인 완료: ${client.user.tag}`);
+  
+  // 모든 데이터 로드
+  await Promise.all([
+    loadStats(),
+    loadValorantSettings(),
+    loadTimeoutHistory(),
+    loadVoiceLog(),
+    loadVolumeSettings()  // 볼륨 설정 로드 추가
+  ]);
+  
+  console.log('초기화 완료');
+});
+
+// 음성 채널 상태 변경 감지
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  // 봇 제외
+  if (newState.member.user.bot && newState.member.roles.cache.has('1135868235108065391')) {
+    return;
+  }
+
+  const logChannel = newState.guild.channels.cache.get(LOG_CHANNEL_ID);
+  if (!logChannel) return;
+
+  const userId = newState.member.id;
+  const guildId = newState.guild.id;
+
+  try {
+    // 음성 채널 입장 시간 기록
+    if (!oldState.channelId && newState.channelId) {
+      await setDoc(doc(db, 'voice_sessions', `${guildId}_${userId}`), {
+        startTime: Date.now(),
+        channelId: newState.channelId,
+        userId: userId,
+        guildId: guildId
+      });
+    }
+
+    // 음성 채널 퇴장 시 통화 시간 계산
+    if (oldState.channelId && !newState.channelId) {
+      const sessionDoc = await getDoc(doc(db, 'voice_sessions', `${guildId}_${userId}`));
+      if (sessionDoc.exists()) {
+        const session = sessionDoc.data();
+        const duration = Date.now() - session.startTime;
+
+        // 통계 문서 가져오기
+        const statsDoc = await getDoc(doc(db, 'stats', 'user'));
+        const stats = statsDoc.exists() ? statsDoc.data() : { voiceTime: {} };
+
+        // 통화 시간 업데이트
+        if (!stats.voiceTime) stats.voiceTime = {};
+        stats.voiceTime[userId] = (stats.voiceTime[userId] || 0) + duration;
+
+        // 통계 저장
+        await setDoc(doc(db, 'stats', 'user'), stats);
+
+        // 세션 문서 삭제
+        await deleteDoc(doc(db, 'voice_sessions', `${guildId}_${userId}`));
+      }
+    }
+
+    // 로그 기록
+    const currentTime = new Date().toLocaleTimeString('ko-KR', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+
+    // 로그 저장
+    await addDoc(collection(db, 'voice_logs'), {
+      timestamp: Date.now(),
+      userId: userId,
+      guildId: guildId,
+      oldChannelId: oldState.channelId,
+      newChannelId: newState.channelId,
+      memberName: newState.member.displayName,
+      type: !oldState.channelId ? 'join' : !newState.channelId ? 'leave' : 'move'
+    });
+
+    // 로그 메시지 전송
+    if (!oldState.channelId && newState.channelId) {
+      logChannel.send(`[${currentTime}] 🎙️ ${newState.member.displayName}님이 ${newState.channel.name} 채널에 입장했습니다.`);
+    } else if (oldState.channelId && !newState.channelId) {
+      logChannel.send(`[${currentTime}] 🚪 ${oldState.member.displayName}님이 ${oldState.channel.name} 채널에서 퇴장했습니다.`);
+    } else if (oldState.channelId !== newState.channelId && oldState.channelId && newState.channelId) {
+      logChannel.send(`[${currentTime}] ↔️ ${newState.member.displayName}님이 ${oldState.channel.name} 채널에서 ${newState.channel.name} 채널로 이동했습니다.`);
+    }
+
+  } catch (error) {
+    console.error('음성 채널 로그 처리 중 오류:', error);
+  }
+});
+
+
+// 타이머 저장
+async function saveTimer(userId, timer) {
+  try {
+    await setDoc(doc(db, 'timers', userId), {
+      endTime: timer.endTime,
+      duration: timer.duration,
+      createdAt: Date.now()
+    });
+  } catch (error) {
+    console.error('타이머 저장 중 오류:', error);
+  }
+}
+
+// 타이머 로드
+async function loadTimers() {
+  try {
+    const timersSnapshot = await getDocs(collection(db, 'timers'));
+    timersSnapshot.forEach(doc => {
+      const timer = doc.data();
+      const remainingTime = timer.endTime - Date.now();
+      
+      if (remainingTime > 0) {
+        // 남은 시간이 있는 타이머만 복원
+        activeTimers.set(doc.id, {
+          endTime: timer.endTime,
+          duration: timer.duration,
+          timeout: setTimeout(async () => {
+            // 타이머 종료 처리
+            activeTimers.delete(doc.id);
+            await deleteDoc(doc(db, 'timers', doc.id));
+          }, remainingTime)
+        });
+      } else {
+        // 이미 끝난 타이머는 삭제
+        deleteDoc(doc(db, 'timers', doc.id));
+      }
+    });
+  } catch (error) {
+    console.error('타이머 로드 중 오류:', error);
+  }
+}
+
+// 봇 시작 시 타이머 로드
+client.once('ready', async () => {
+  console.log(`로그인 완료: ${client.user.tag}`);
+  
+  // 모든 데이터 로드
+  await Promise.all([
+    loadStats(),
+    loadValorantSettings(),
+    loadTimeoutHistory(),
+    loadVoiceLog(),
+    loadVolumeSettings(),
+    loadTimers()  // 타이머 로드 추가
+  ]);
+  
+  console.log('초기화 완료');
+});
 
 client.login(process.env.DISCORD_TOKEN);
