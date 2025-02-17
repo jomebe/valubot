@@ -2795,7 +2795,6 @@ client.on('messageCreate', async (message) => {
 
   // "ㅂ데이터" 명령어 처리 추가
   else if (content.startsWith('ㅂ데이터')) {
-    // 서버 소유자 확인
     if (message.author.id !== message.guild.ownerId) {
       return message.reply('❌ 이 명령어는 서버 소유자만 사용할 수 있습니다.');
     }
@@ -2843,53 +2842,35 @@ client.on('messageCreate', async (message) => {
     try {
       switch (subCommand) {
         case '보기':
-          const docSnap = await getDoc(doc(db, selectedData.collection, selectedData.document));
-          if (docSnap.exists()) {
-            const formattedData = JSON.stringify(docSnap.data(), null, 2);
-            if (formattedData.length > 1900) {
-              const buffer = Buffer.from(formattedData, 'utf-8');
-              const attachment = new AttachmentBuilder(buffer, { name: `${dataType}_data.json` });
-              await message.reply({ 
-                content: `📊 ${selectedData.name} 데이터가 너무 커서 파일로 전송됩니다.`,
-                files: [attachment] 
-              });
+          try {
+            const dataRef = query(collection(db, selectedData.collection));
+            const docSnap = await getDoc(doc(db, selectedData.collection, selectedData.document));
+            if (docSnap.exists()) {
+              const formattedData = JSON.stringify(docSnap.data(), null, 2);
+              if (formattedData.length > 1900) {
+                const buffer = Buffer.from(formattedData, 'utf-8');
+                const attachment = new AttachmentBuilder(buffer, { name: `${dataType}_data.json` });
+                await message.reply({ 
+                  content: `📊 ${selectedData.name} 데이터가 너무 커서 파일로 전송됩니다.`,
+                  files: [attachment] 
+                });
+              } else {
+                await message.reply(`📊 ${selectedData.name} 데이터:\n\`\`\`json\n${formattedData}\n\`\`\``);
+              }
             } else {
-              await message.reply(`📊 ${selectedData.name} 데이터:\n\`\`\`json\n${formattedData}\n\`\`\``);
+              await message.reply(`❌ ${selectedData.name} 데이터가 없습니다.`);
             }
-          } else {
-            await message.reply(`❌ ${selectedData.name} 데이터가 없습니다.`);
+          } catch (error) {
+            console.error('데이터 조회 중 오류:', error);
+            await message.reply('❌ 데이터 조회 중 오류가 발생했습니다.');
           }
           break;
-
-        case '초기화':
-          const defaultData = dataType === 'stats' ? { voiceTime: {}, messageCount: {} } : {};
-          await setDoc(doc(db, selectedData.collection, selectedData.document), defaultData);
-          selectedData.data = defaultData;
-          await message.reply(`✅ ${selectedData.name}가 초기화되었습니다.`);
-          break;
-
-        case '백업':
-          const backupSnap = await getDoc(doc(db, selectedData.collection, selectedData.document));
-          if (backupSnap.exists()) {
-            const backupData = JSON.stringify(backupSnap.data(), null, 2);
-            const buffer = Buffer.from(backupData, 'utf-8');
-            const attachment = new AttachmentBuilder(buffer, { name: `${dataType}_backup.json` });
-            await message.reply({ 
-              content: `📥 ${selectedData.name} 백업 파일이 생성되었습니다.`,
-              files: [attachment] 
-            });
-          } else {
-            await message.reply(`❌ ${selectedData.name} 데이터가 없습니다.`);
-          }
-          break;
-
-        case '수정':
-          // 수정 기능은 보안상의 이유로 제한적으로 구현
-          await message.reply('❌ 데이터 수정은 관리자에게 문의해주세요.');
-          break;
+        
+        default:
+          await message.reply('❌ 올바른 하위 명령어가 아닙니다. (보기/초기화/백업/수정)');
       }
     } catch (error) {
-      console.error(`데이터 처리 중 오류 발생:`, error);
+      console.error('데이터 처리 중 오류:', error);
       await message.reply('❌ 데이터 처리 중 오류가 발생했습니다.');
     }
   }
@@ -4048,7 +4029,19 @@ async function processTTSQueue(guildId) {
 
 // Firebase 관련 import 추가
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, getDocs, connectFirestoreEmulator } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  collection, 
+  addDoc, 
+  getDocs,
+  query,
+  where 
+} from 'firebase/firestore';
 
 // Firebase 설정
 const firebaseConfig = {
@@ -4265,26 +4258,26 @@ async function saveTimer(userId, timer) {
   }
 }
 
-async function loadTimers(db) {
+async function loadTimers() {
   try {
-    const timersSnapshot = await getDocs(collection(db, 'timers'));
+    // query로 감싸서 collection 참조
+    const timersRef = query(collection(db, 'timers'));
+    const timersSnapshot = await getDocs(timersRef);
+    
     timersSnapshot.forEach(doc => {
       const timer = doc.data();
       const remainingTime = timer.endTime - Date.now();
       
       if (remainingTime > 0) {
-        // 남은 시간이 있는 타이머만 복원
         activeTimers.set(doc.id, {
           endTime: timer.endTime,
           duration: timer.duration,
           timeout: setTimeout(async () => {
-            // 타이머 종료 처리
             activeTimers.delete(doc.id);
             await deleteDoc(doc(db, 'timers', doc.id));
           }, remainingTime)
         });
       } else {
-        // 이미 끝난 타이머는 삭제
         deleteDoc(doc(db, 'timers', doc.id));
       }
     });
@@ -4292,5 +4285,28 @@ async function loadTimers(db) {
     console.error('타이머 로드 중 오류:', error);
   }
 }
+
+// voiceStateUpdate 이벤트 핸들러에서 로그 저장 부분 수정
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  // ... 기존 코드 ...
+  
+  // 로그 저장
+  try {
+    const logsRef = query(collection(db, 'voice_logs'));
+    await addDoc(logsRef, {
+      timestamp: Date.now(),
+      userId: userId,
+      guildId: guildId,
+      oldChannelId: oldState.channelId,
+      newChannelId: newState.channelId,
+      memberName: newState.member.displayName,
+      type: !oldState.channelId ? 'join' : !newState.channelId ? 'leave' : 'move'
+    });
+  } catch (error) {
+    console.error('음성 로그 저장 중 오류:', error);
+  }
+  
+  // ... 나머지 코드 ...
+});
 
 client.login(process.env.DISCORD_TOKEN);
