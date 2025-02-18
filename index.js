@@ -3687,10 +3687,8 @@ client.on('voiceStateUpdate', (oldState, newState) => {
       minute: '2-digit',
       second: '2-digit',  // 초 추가
       hour12: false,
-      hourCycle: 'h23'
-    }).replace(/^[0-9]{2}:/, (match) => {
-      return match;
-    });
+      hourCycle: 'h23'  // h23으로 설정하여 00-23 범위 사용
+    }).replace(/24:/, '00:');  // 24시는 00시로 변경
     
     const count = voiceCycleCounts[guildId][userId];
     
