@@ -3114,53 +3114,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 });
 
 // 음성 채널 상태 변경 감지
-client.on('voiceStateUpdate', (oldState, newState) => {
-  // 봇이고 특정 역할을 가지고 있다면 로그를 남기지 않음
-  if (newState.member.user.bot && newState.member.roles.cache.has('1135868235108065391')) {
-    return;
-  }
 
-  const logChannel = newState.guild.channels.cache.get(LOG_CHANNEL_ID);
-  if (!logChannel) return;
-
-  const userId = newState.member.id;
-
-  // 음성 채널 입장 시간 기록
-  if (!oldState.channelId && newState.channelId) {
-    voiceStartTimes.set(userId, Date.now());
-  }
-
-  // 음성 채널 퇴장 시 통화 시간 계산
-  if (oldState.channelId && !newState.channelId) {
-    const startTime = voiceStartTimes.get(userId);
-    if (startTime) {
-      const duration = Date.now() - startTime;
-      voiceStartTimes.delete(userId);
-      
-      // 통화 시간 통계 업데이트
-      if (!userStats.voiceTime) userStats.voiceTime = {};
-      userStats.voiceTime[userId] = (userStats.voiceTime[userId] || 0) + duration;
-      saveStats();
-    }
-  }
-
-    const currentTime = new Date().toLocaleTimeString('ko-KR', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-
-  if (!oldState.channelId && newState.channelId) {
-    logChannel.send(`[${currentTime}] 🎙️ ${newState.member.displayName}님이 ${newState.channel.name} 채널에 입장했습니다.`);
-  } else if (oldState.channelId && !newState.channelId) {
-    logChannel.send(`[${currentTime}] 🚪 ${oldState.member.displayName}님이 ${oldState.channel.name} 채널에서 퇴장했습니다.`);
-  } else if (oldState.channelId !== newState.channelId && oldState.channelId && newState.channelId) {
-    logChannel.send(`[${currentTime}] ↔️ ${newState.member.displayName}님이 ${oldState.channel.name} 채널에서 ${newState.channel.name} 채널로 이동했습니다.`);
-  }
-  
-  // ... 나머지 코드는 그대로 유지
-});
 
 // 대기열 임베드 업데이트 함수 수정
 function updateQueueEmbed(queue) {
@@ -3689,14 +3643,7 @@ setInterval(() => {
   console.log('음성 로그가 초기화되었습니다.');
 }, 5 * 60 * 1000);
 
-// voiceStateUpdate 이벤트 핸들러 수정
-client.on('voiceStateUpdate', (oldState, newState) => {
-  // 기존 음성 로그 코드는 그대로 유지
-  if (newState.member.user.bot && newState.member.roles.cache.has('1135868235108065391')) {
-    return;
-  }
-  // ... 나머지 음성 로그 코드
-});
+
 
 // 상단에 상수 추가
 const VOICE_CYCLE_ROLE_ID = process.env.VOICE_CYCLE_ROLE_ID;
@@ -3731,27 +3678,38 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     voiceCycleCounts[guildId][userId]++;
     
     const logChannel = newState.guild.channels.cache.get(LOG_CHANNEL_ID);
-    if (logChannel) {
-      const currentTime = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const count = voiceCycleCounts[guildId][userId];
-      
-      if (isJoining) {
-        logChannel.send(`[${currentTime}] 🎙️ ${newState.member.user.tag}님이 ${newState.channel.name} 채널에 입장했습니다. (${count}회)`);
-      } else if (isLeaving) {
-        logChannel.send(`[${currentTime}] 🎙️ ${newState.member.user.tag}님이 ${oldState.channel.name} 채널에서 퇴장했습니다. (${count}회)`);
-      } else if (isSwitching) {
-        logChannel.send(`[${currentTime}] 🎙️ ${newState.member.user.tag}님이 ${oldState.channel.name} 채널에서 ${newState.channel.name} 채널로 이동했습니다. (${count}회)`);
-      }
+    if (!logChannel) return;
 
-      // 임계값 도달 시 관리자 멘션
-      if (count === VOICE_CYCLE_THRESHOLD) {
-        const roleToMention = newState.guild.roles.cache.get(VOICE_CYCLE_ROLE_ID);
-        if (roleToMention) {
-          logChannel.send({
-            content: `${roleToMention} ${newState.member.user.tag}님이 음성 채널을 ${VOICE_CYCLE_THRESHOLD}회 이상 반복 입/퇴장했습니다.`,
-            allowedMentions: { roles: [VOICE_CYCLE_ROLE_ID] }
-          });
-        }
+    // 한국 시간으로 변환 (수정된 부분)
+    const currentTime = new Date().toLocaleTimeString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',  // 초 추가
+      hour12: false,
+      hourCycle: 'h23'
+    }).replace(/^[0-9]{2}:/, (match) => {
+      return match;
+    });
+    
+    const count = voiceCycleCounts[guildId][userId];
+    
+    if (isJoining) {
+      logChannel.send(`[${currentTime}] 🎙️ ${newState.member.user.tag}님이 ${newState.channel.name} 채널에 입장했습니다. (${count}회)`);
+    } else if (isLeaving) {
+      logChannel.send(`[${currentTime}] 🎙️ ${newState.member.user.tag}님이 ${oldState.channel.name} 채널에서 퇴장했습니다. (${count}회)`);
+    } else if (isSwitching) {
+      logChannel.send(`[${currentTime}] 🎙️ ${newState.member.user.tag}님이 ${oldState.channel.name} 채널에서 ${newState.channel.name} 채널로 이동했습니다. (${count}회)`);
+    }
+
+    // 임계값 도달 시 관리자 멘션
+    if (count === VOICE_CYCLE_THRESHOLD) {
+      const roleToMention = newState.guild.roles.cache.get(VOICE_CYCLE_ROLE_ID);
+      if (roleToMention) {
+        logChannel.send({
+          content: `${roleToMention} ${newState.member.user.tag}님이 음성 채널을 ${VOICE_CYCLE_THRESHOLD}회 이상 반복 입/퇴장했습니다.`,
+          allowedMentions: { roles: [VOICE_CYCLE_ROLE_ID] }
+        });
       }
     }
 
