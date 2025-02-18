@@ -2852,7 +2852,10 @@ client.on('messageCreate', async (message) => {
           }
         });
       }
-
+      if (settings?.enabled && message.channelId === '1122083861535391745') {
+        
+      return;
+      }
       // 음성 재생 로직
       const tempFile = path.join(TEMP_DIR, `tts_${Date.now()}.mp3`);
       const settings = ttsSettings.get(message.author.id);
@@ -2896,7 +2899,9 @@ client.on('messageCreate', async (message) => {
 
     } catch (error) {
       console.error('TTS 실행 중 오류:', error);
-      message.reply('❌ TTS 실행 중 오류가 발생했습니다.');
+      // if (message.channelId !== '1122083861535391745') {
+      //   message.reply('❌ TTS 실행 중 오류가 발생했습니다.');
+      // }
     }
   }
 
@@ -3086,14 +3091,14 @@ client.on('messageCreate', async (message) => {
     // 기존 TTS 설정 명령어 처리 로직...
   }
 
-  // 메시지 이벤트 핸들러에서 TTS 처리 부분 수정
-  const settings = ttsSettings.get(message.author.id);
-  if (settings?.enabled) {
-    // TTS는 지정된 채널에서만 작동
-    if (message.channelId === '1122083861535391745') {
+  // 일반 메시지의 TTS 처리 - 지정된 채널에서만 작동
+  console.log("message.channelId:", message.channelId);
+  if (message.channelId === '1122083861535391745') {  // 채널 체크를 가장 먼저
+    console.log("message.channelId complete");
+    const settings = ttsSettings.get(message.author.id);
+    if (settings?.enabled) {
       const voiceChannel = message.member?.voice.channel;
       if (voiceChannel) {
-        // 기존 TTS 처리 로직...
         const queue = ttsQueues.get(message.guildId) || {
           items: [],
           isProcessing: false
@@ -3113,8 +3118,10 @@ client.on('messageCreate', async (message) => {
       }
     }
   }
-
-  // 나머지 명령어 처리...
+  else{
+    
+    return message.reply('❌ TTS는 <#1122083861535391745> 채널에서만 사용할 수 있습니다.');
+  }
 });
 
 // 타임아웃 감지
