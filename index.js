@@ -2731,6 +2731,11 @@ client.on('messageCreate', async (message) => {
 
   // "ㅂtts" 명령어 처리 수정
   else if (content.startsWith('ㅂtts')) {
+    // TTS 명령어는 지정된 채널에서만 사용 가능
+    if (message.channelId !== '1122083861535391745') {
+      return message.reply('❌ TTS 명령어는 <#1122083861535391745> 채널에서만 사용할 수 있습니다.');
+    }
+
     const args = content.slice(4).trim().split(' ');
     const command = args[0];
     
@@ -3070,6 +3075,15 @@ client.on('messageCreate', async (message) => {
       console.error('데이터 관리 중 오류:', error);
       message.reply('❌ 데이터 처리 중 오류가 발생했습니다.');
     }
+  }
+
+  // ㅂtts설정 명령어도 같은 채널 제한 적용
+  if (message.content.startsWith('ㅂtts설정')) {
+    if (message.channelId !== '1122083861535391745') {
+      return message.reply('❌ TTS 명령어는 <#1122083861535391745> 채널에서만 사용할 수 있습니다.');
+    }
+
+    // 기존 TTS 설정 명령어 처리 로직...
   }
 });
 
