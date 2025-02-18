@@ -994,7 +994,7 @@ client.on('messageCreate', async (message) => {
       return ['✅', '❌'].includes(reaction.emoji.name) && !user.bot;
     };
 
-    const collector = queueMessage.createReactionCollector({ filter, time: 36000000 }); // 1시간 동안 유지
+    const collector = queueMessage.createReactionCollector({ filter, time: 86400000 }); // 1시간 동안 유지
 
     collector.on('collect', async (reaction, user) => {
       const queue = getWaitingQueue(message.guild.id);
