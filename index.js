@@ -3085,6 +3085,36 @@ client.on('messageCreate', async (message) => {
 
     // 기존 TTS 설정 명령어 처리 로직...
   }
+
+  // 메시지 이벤트 핸들러에서 TTS 처리 부분 수정
+  const settings = ttsSettings.get(message.author.id);
+  if (settings?.enabled) {
+    // TTS는 지정된 채널에서만 작동
+    if (message.channelId === '1122083861535391745') {
+      const voiceChannel = message.member?.voice.channel;
+      if (voiceChannel) {
+        // 기존 TTS 처리 로직...
+        const queue = ttsQueues.get(message.guildId) || {
+          items: [],
+          isProcessing: false
+        };
+
+        queue.items.push({
+          text: message.content,
+          voiceChannel: voiceChannel,
+          language: settings.language
+        });
+
+        ttsQueues.set(message.guildId, queue);
+
+        if (!queue.isProcessing) {
+          processTTSQueue(message.guildId);
+        }
+      }
+    }
+  }
+
+  // 나머지 명령어 처리...
 });
 
 // 타임아웃 감지
