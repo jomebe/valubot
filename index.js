@@ -108,6 +108,9 @@ const valorantMaps = [
 ];
 
 
+  // OpenRouter 설정 추가
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL;
   // TTS 설정을 저장할 Map
   const ttsSettings = new Map();
 // 서버별 음악 큐와 볼륨을 저장할 Map 선언 부분 수정
@@ -2839,6 +2842,70 @@ client.on('messageCreate', async (message) => {
       }
     }
   }
+
+
+  // ㅂ지피티 명령어 처리
+  else if (content.startsWith('ㅂ지피티') || content.startsWith('ㅂㅈㅍㅌ')) {
+    const question = content.slice(4).trim();
+    
+    if (!question) {
+      return message.reply('사용법: ㅂ지피티 [질문]\n예시: ㅂ지피티 안녕하세요!');
+    }
+
+    try {
+      const loadingMsg = await message.reply('🤔 생각하는 중...');
+
+      const response = await axios.post(`${OPENROUTER_BASE_URL}/chat/completions`,
+        {
+          model: "deepseek/deepseek-r1:free",
+          messages: [
+            {
+              role: "system",
+              content: "당신은 친절하고 도움이 되는 AI 어시스턴트입니다. 한국어로 대화합니다."
+            },
+            {
+              role: "user",
+              content: question
+            }
+          ]
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://discord.com',
+            'X-Title': 'Discord Bot',
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const answer = response.data.choices[0].message.content;
+      
+      const embed = {
+        color: 0x0099ff,
+        title: '🤖 AI 응답',
+        fields: [
+          {
+            name: '질문',
+            value: question
+          },
+          {
+            name: '답변',
+            value: answer
+          }
+        ],
+        footer: {
+          text: 'Powered by DeepSeek-R1'
+        }
+      };
+
+      await loadingMsg.edit({ content: '', embeds: [embed] });
+
+    } catch (error) {
+      console.error('AI 응답 생성 중 오류:', error);
+      message.reply('죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다.');
+    }
+  }
 });
 
 // 타임아웃 감지
@@ -4008,18 +4075,22 @@ async function processTTSQueue(guildId) {
   }
 }
 
-// Express 서버 설정
+// Express 서버 설정 부분 수정
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;  // Render는 자체적으로 PORT 환경변수를 제공합니다
 
-// 기본 라우트
-app.get('/', (req, res) => {
-  res.send('Bot is running!');
+// 서버 시작 부분에 에러 핸들링 추가
+app.listen(PORT, '0.0.0.0', (err) => {  // 모든 IP에서의 접근 허용
+  if (err) {
+    console.error('서버 시작 실패:', err);
+    return;
+  }
+  console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+}).on('error', (err) => {
+  console.error('서버 에러:', err);
 });
 
-// 서버 시작
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// Discord 봇 로그인 부분에 에러 핸들링 추가
+client.login(process.env.DISCORD_TOKEN).catch(err => {
+  console.error('Discord 봇 로그인 실패:', err);
 });
-
-client.login(process.env.DISCORD_TOKEN);
