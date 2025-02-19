@@ -836,7 +836,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ출석" 명령어 처리
-  else if (content === 'ㅂ출첵') {
+  else if (content === 'ㅂ출첵' || content === 'ㅂㅊㅊ') {
     const userId = message.author.id;
     const today = new Date().toLocaleDateString('ko-KR');
     
@@ -898,7 +898,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ출석현황" 명령어 처리
-  else if (content === 'ㅂ출첵현황') {
+  else if (content === 'ㅂ출첵현황' || content === 'ㅂㅊㅊㅎㅎ') {
     const userId = message.author.id;
     
     if (!attendanceData[userId]) {
@@ -936,7 +936,8 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ핑" 명령어 처리 - 봇의 지연시간 확인
-  else if (content === 'ㅂ핑') {
+  
+  else if (content === 'ㅂ핑' || content === 'ㅂㅍ') {
     const sent = await message.reply('핑 측정 중...');
     sent.edit(`🏓 퐁! 지연시간: ${sent.createdTimestamp - message.createdTimestamp}ms`);
   }
@@ -987,7 +988,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ서버정보" 명령어 처리
-  else if (content === 'ㅂ서버정보') {
+  else if (content === 'ㅂ서버정보' || content === 'ㅂㅅㅂㅈㅂ') {
     const guild = message.guild;
     const embed = {
       color: 0x0099ff,
@@ -1034,7 +1035,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ랜덤맵" 명령어 처리
-  else if (content === 'ㅂ랜덤맵') {
+  else if (content === 'ㅂ랜덤맵' || content === 'ㅂㄹㄷㅁ') {
     const randomMap = valorantMaps[Math.floor(Math.random() * valorantMaps.length)];
     
     const attachment = new AttachmentBuilder(randomMap.image);
@@ -1075,49 +1076,50 @@ client.on('messageCreate', async (message) => {
       fields: [
         {
           name: '🎮 발로란트 명령어',
-          value: '`발로등록 닉네임#태그` (ㅂㄹㄷㄹ) - 발로란트 계정 등록\n' +
-                 '`발로 닉네임#태그` (ㅂㄹ) - 발로란트 전적 검색\n' +
-                 '`요원 닉네임#태그` (ㅇㅇ) - 에이전트별 통계\n' +
-                 '`무기 닉네임#태그` (ㅁㄱ) - 무기별 통계\n' +
-                 '`비교 닉네임1#태그1 vs 닉네임2#태그2` (ㅂㄱ) - 플레이어 통계 비교\n' +
-                 '`티어 닉네임#태그` (ㅌㅇ) - 티어 정보 확인\n' +
-                 '`매치 닉네임#태그` (ㅁㅊ) - 최근 매치 기록\n' +
-                 '`리더보드` (ㄹㄷㅂㄷ) - 서버 내 티어 순위\n' +
-                 '`조준점 [코드]` (ㅈㅈㅈ) - 조준점 미리보기 생성\n' +
-                 '`랜덤맵` (ㄹㄷㅁ) - 랜덤 맵 선택'
+          value: '`발로등록/ㅂㄹㄷㄹ 닉네임#태그` - 발로란트 계정 등록\n' +
+                 '`발로/ㅂㄹ 닉네임#태그` - 발로란트 전적 검색\n' +
+                 '`요원/ㅇㅇ 닉네임#태그` - 에이전트별 통계\n' +
+                 '`무기/ㅁㄱ 닉네임#태그` - 무기별 통계\n' +
+                 '`비교/ㅂㄱ 닉네임1#태그1 vs 닉네임2#태그2` - 플레이어 통계 비교\n' +
+                 '`티어/ㅌㅇ 닉네임#태그` - 티어 정보 확인\n' +
+                 '`티어갱신/ㅌㅇㅊㅇㅅ` - 티어 정보 갱신\n' +
+                 '`매치/ㅁㅊ 닉네임#태그` - 최근 매치 기록\n' +
+                 '`리더보드/ㄹㄷㅂㄷ` - 서버 내 티어 순위\n' +
+                 '`조준점/ㅈㅈㅈ [코드]` - 조준점 미리보기 생성\n' +
+                 '`랜덤맵/ㄹㄷㅁ` - 랜덤 맵 선택'
         },
         {
           name: '🎙️ TTS 명령어',
-          value: '`tts O/X` - TTS 켜기/끄기\n' +
-                 '`tts언어 [ko/en/ja/ch/la]` - TTS 언어 변경\n' +
-                 '• ko: 한국어\n' +
-                 '• en: 영어\n' +
-                 '• ja: 일본어\n' +
-                 '• ch: 중국어\n' +
-                 '• la: 라틴어'
+          value: '`tts/ㅌㅌㅅ O/X` - TTS 켜기/끄기\n' +
+                 '`tts설정/ㅌㅌㅅㅅㅈ [ko/en/ja/ch/la]` - TTS 언어 변경'
         },
         {
           name: '🎲 게임/재미',
-          value: '`선착 [인원수] [제목] [멘션여부]` - 선착순 모집\n' +
-                 '`선착현황` - 선착순 현황 확인\n' +
-                 '`선착취소` - 선착순 모집 취소\n' +
-                 '`주사위` - 주사위 굴리기\n' +
-                 '`랜덤 [항목1] [항목2]...` - 랜덤 선택' +
-                 '`팀나누기` - 음성채널 인원 팀 나누기'
+          value: '`선착/ㅅㅊ [인원수] [제목] [멘션여부]` - 선착순 모집\n' +
+                 '`선착현황/ㅅㅊㅎㅎ` - 선착순 현황 확인\n' +
+                 '`선착취소/ㅅㅊㅊㅅ` - 선착순 모집 취소\n' +
+                 '`주사위/ㅈㅅㅇ` - 주사위 굴리기\n' +
+                 '`주사위게임/ㅈㅅㅇㄱㅇ` - 주사위 게임\n' +
+                 '`가위바위보/ㄱㅇㅂㅇㅂ` - 가위바위보 게임\n' +
+                 '`랜덤/ㄹㄷ [항목1] [항목2]...` - 랜덤 선택\n' +
+                 '`팀나누기/ㅌㄴㄴㄱ` - 음성채널 인원 팀 나누기'
         },
         {
           name: '📊 기타 명령어',
-          value: '`전과` - 타임아웃 기록 확인\n' +
-                 '`통계` - 서버 활동 통계 확인\n' +
-                 '`청소` - 메시지 일괄 삭제\n' +
-                 '`투표` - 투표 생성' +
-                 '`출첵` - 출석체크\n' +
-                 '`출첵현황` - 출석 현황 확인\n' +
-                 '`핑` - 봇 지연시간 확인'
+          value: '`전과/ㅈㄱ` - 타임아웃 기록 확인\n' +
+                 '`통계/ㅌㄱ` - 서버 활동 통계 확인\n' +
+                 '`청소/ㅊㅅ` - 메시지 일괄 삭제\n' +
+                 '`투표/ㅌㅍ` - 투표 생성\n' +
+                 '`타이머/ㅌㅇㅁ` - 타이머 생성\n' +
+                 '`출첵/ㅊㅊ` - 출석체크\n' +
+                 '`출첵현황/ㅊㅊㅎㅎ` - 출석 현황 확인\n' +
+                 '`핑/ㅍ` - 봇 지연시간 확인' +
+                 '`메시지순위/ㅁㅅㅈㅅㅇ` - 메시지 순위 확인' +
+                 '`통화순위/ㅌㅎㅅㅈㅅㅇ` - 통화 순위 확인'
         }
       ],
       footer: {
-        text: '자세한 사용법은 각 명령어 앞에 ㅂ를 붙여서 실행해보세요!'
+        text: '모든 명령어는 ㅂ로 시작하며, 초성으로도 사용 가능합니다!'
       }
     };
 
@@ -1125,7 +1127,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ주사위게임" 명령어 처리
-  else if (content === 'ㅂ주사위게임') {
+  else if (content === 'ㅂ주사위게임' || content === 'ㅂㅈㅅㅇㄱㅇ') {
     const userRoll = Math.floor(Math.random() * 6) + 1;
     const botRoll = Math.floor(Math.random() * 6) + 1;
 
@@ -1608,7 +1610,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ통화순위" 명령어 처리
-  else if (content === 'ㅂ통화순위') {
+  else if (content === 'ㅂ통화순위' || content === 'ㅂㅌㅎㅅㅇ') {
     // 현재 통화중인 유저들의 시간도 포함
     const currentVoiceTimes = { ...userStats.voiceTime };
     voiceStartTimes.forEach((startTime, userId) => {
@@ -1643,7 +1645,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ메시지순위" 명령어 처리
-  else if (content === 'ㅂ메시지순위') {
+  else if (content === 'ㅂ메시지순위' || content === 'ㅂㅁㅅㅈㅅㅇ') {
     const sortedUsers = Object.entries(userStats.messageCount)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10);
@@ -1671,7 +1673,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ통계초기화" 명령어 추가 (관리자 전용)
-  else if (content === 'ㅂ통계초기화') {
+  else if (content === 'ㅂ통계초기화' || content === 'ㅂㅌㄱㅊㄱㅎ') {
     if (!message.member.roles.cache.some(role => role.name === 'Manager | 관리자')) {
       return message.reply('❌ 관리자만 사용할 수 있는 명령어입니다.');
     }
@@ -1803,7 +1805,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ티어갱신" 명령어 수정
-  else if (content === 'ㅂ티어갱신') {
+  else if (content === 'ㅂ티어갱신' || content === 'ㅂㅌㅇㄱㅅ') {
     const discordId = message.author.id;
     const userData = valorantSettings[discordId];
 
@@ -1861,7 +1863,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ전과" 명령어 처리 추가
-  else if (content === 'ㅂ전과') {
+  else if (content === 'ㅂ전과' || content === 'ㅂㅈㄱ') {
     const userId = message.author.id;
     const userData = timeoutHistoryData[userId];
 
@@ -1913,29 +1915,8 @@ client.on('messageCreate', async (message) => {
     message.reply({ embeds: [embed] });
   }
 
-  // "ㅂ랜덤맵" 명령어 처리
-  else if (content === 'ㅂ랜덤맵') {
-    const randomMap = valorantMaps[Math.floor(Math.random() * valorantMaps.length)];
-    
-    const attachment = new AttachmentBuilder(randomMap.image);
-    const embed = {
-      color: 0xFF4654,
-      title: '🎮 발로란트 랜덤 맵',
-      description: `선택된 맵: **${randomMap.name}**`,
-      image: {
-        url: 'attachment://' + randomMap.image.split('/').pop()
-      },
-      footer: {
-        text: '다시 뽑으려면 ㅂ랜덤맵을 입력하세요.'
-      },
-      timestamp: new Date()
-    };
-
-    message.reply({ embeds: [embed], files: [attachment] });
-  }
-
   // "ㅂ셔플" 명령어 처리 추가
-  else if (content === 'ㅂ셔플') {
+  else if (content === 'ㅂ셔플' || content === 'ㅂㅅㅍ') {
     const queue = getServerQueue(message.guild.id);
     if (!queue || !queue.songs || queue.songs.length <= 1) {
       return message.reply('❌ 셔플할 노래가 충분하지 않습니다.');
@@ -2049,7 +2030,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ리더보드" 명령어 처리
-  else if (content === 'ㅂ리더보드') {
+  else if (content === 'ㅂ리더보드' || content === 'ㅂㄹㄷㅂㄷ') {
     try {
       const loadingMsg = await message.reply('🏆 리더보드를 생성중입니다...');
       const leaderboard = await generateLeaderboard(message.guild.id);
@@ -2071,7 +2052,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ매치" 명령어 처리 추가
-  else if (content.startsWith('ㅂ매치')) {
+  else if (content.startsWith('ㅂ매치') || content === 'ㅂㅁㅊ') {
     const args = content.slice(4).trim().split('#');
     if (args.length !== 2) {
       return message.reply('사용법: ㅂ매치 닉네임#태그\n예시: ㅂ매치 닉네임#KR1');
@@ -2108,7 +2089,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // MMR 변화 추적 함수
-  else if (content.startsWith('ㅂ티어')) {
+  else if (content.startsWith('ㅂ티어') || content === 'ㅂㅌㅇ') {
     const args = content.slice(4).trim().split('#');
     if (args.length !== 2) {
       return message.reply('사용법: ㅂ티어 닉네임#태그\n예시: ㅂ티어 닉네임#KR1');
@@ -2164,7 +2145,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // 플레이어 비교 함수 수정
-  else if (content.startsWith('ㅂ비교')) {
+  else if (content.startsWith('ㅂ비교') || content === 'ㅂㅂㄱ') {
     const args = content.slice(3).trim().split(/\s+/);
     
     if (args.length < 2) {
@@ -2248,7 +2229,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ조준점" 명령어 처리
-  else if (content.startsWith('ㅂ조준점')) {
+  else if (content.startsWith('ㅂ조준점') || content === 'ㅂㅈㅈㅈ') {
     const args = content.slice(5).trim().split(' ');
     const code = args.join(' ');
 
@@ -2297,7 +2278,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ요원" 명령어 처리 수정
-  else if (content.startsWith('ㅂ요원')) {
+  else if (content.startsWith('ㅂ요원') || content === 'ㅂㅇㅇ') {
     const args = content.slice(4).trim().split('#');
     if (args.length !== 2) {
       return message.reply('사용법: ㅂ요원 닉네임#태그\n예시: ㅂ요원 닉네임#KR1');
@@ -2378,7 +2359,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ무기" 명령어 처리 수정
-  else if (content.startsWith('ㅂ무기')) {
+  else if (content.startsWith('ㅂ무기') || content === 'ㅂㅁㄱ') {
     const args = content.slice(4).trim().split('#');
     if (args.length !== 2) {
       return message.reply('사용법: ㅂ무기 닉네임#태그\n예시: ㅂ무기 닉네임#KR1');
@@ -2645,7 +2626,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // "ㅂ데이터" 명령어 처리 추가
-  else if (content.startsWith('ㅂ데이터')) {
+  else if (content.startsWith('ㅂ데이터') || content === 'ㅂㄷㅇㅌ') {
     // 서버 소유자 확인
     if (message.author.id !== message.guild.ownerId) {
       return message.reply('❌ 이 명령어는 서버 소유자만 사용할 수 있습니다.');
