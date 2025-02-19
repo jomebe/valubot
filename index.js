@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// 환경변수 로드 확인
+console.log('OpenAI API Key:', process.env.OPENAI_API_KEY ? '설정됨' : '미설정');
+
 // require 구문을 import로 변경
 import { Client, GatewayIntentBits, Events, AttachmentBuilder } from 'discord.js';
 import { createAudioPlayer, createAudioResource, joinVoiceChannel, AudioPlayerStatus, NoSubscriberBehavior, getVoiceConnection, StreamType } from '@discordjs/voice';
@@ -118,6 +121,9 @@ const waitingQueues = new Map();
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// OpenAI 초기화 확인
+console.log('OpenAI 초기화:', openai.apiKey ? '성공' : '실패');
 
 // 출석 데이터를 저장할 객체
 let attendanceData = {};
