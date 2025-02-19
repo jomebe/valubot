@@ -3118,10 +3118,6 @@ client.on('messageCreate', async (message) => {
       }
     }
   }
-  else{
-    
-    return message.reply('❌ TTS는 <#1122083861535391745> 채널에서만 사용할 수 있습니다.');
-  }
 });
 
 // 타임아웃 감지
