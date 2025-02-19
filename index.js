@@ -107,12 +107,15 @@ const valorantMaps = [
   }
 ];
 
+// 대화 기록을 저장할 Map 추가 (파일 상단의 다른 Map 선언들 근처에 추가)
+const conversationHistory = new Map();
 
-  // OpenRouter 설정 추가
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-  const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL;
-  // TTS 설정을 저장할 Map
-  const ttsSettings = new Map();
+// OpenRouter 설정 추가
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL;
+// TTS 설정을 저장할 Map
+const ttsSettings = new Map();
+
 // 서버별 음악 큐와 볼륨을 저장할 Map 선언 부분 수정
 const queues = new Map();
 const volumeSettings = new Map();  // Map으로 변경
@@ -2844,43 +2847,84 @@ client.on('messageCreate', async (message) => {
   }
 
 
-  // ㅂ지피티 명령어 처리
+  // ㅂ지피티 명령어 처리 부분 수정
   else if (content.startsWith('ㅂ지피티') || content.startsWith('ㅂㅈㅍㅌ')) {
     const question = content.slice(4).trim();
     
     if (!question) {
-      return message.reply('사용법: ㅂ지피티 [질문]\n예시: ㅂ지피티 안녕하세요!');
+      return message.reply('사용법:\nㅂ지피티 [질문] - 일반 질문하기\n이미지와 함께 질문하려면 이미지를 첨부하고 질문을 작성하세요.\n\n대화를 초기화하려면 "초기화"라고 입력하세요.');
+    }
+
+    // 대화 초기화 요청 확인
+    if (question.toLowerCase() === '초기화') {
+      conversationHistory.delete(message.author.id);
+      return message.reply('대화 기록이 초기화되었습니다. 새로운 대화를 시작하세요!');
     }
 
     try {
+      const startTime = Date.now();  // 시작 시간 기록
       const loadingMsg = await message.reply('🤔 생각하는 중...');
 
-      const response = await axios.post(`${OPENROUTER_BASE_URL}/chat/completions`,
+      // 사용자의 대화 기록 가져오기
+      let userHistory = conversationHistory.get(message.author.id) || [];
+      
+      // 대화 기록이 너무 길면 최근 5개만 유지
+      if (userHistory.length > 100) {
+        userHistory = userHistory.slice(-50);
+      }
+
+      const imageAttachment = message.attachments.first();
+      let requestBody = {
+        model: "google/gemini-2.0-flash-lite-preview-02-05:free",
+        max_tokens: 2000,
+        temperature: 0.8,
+        timeout: 30000
+      };
+
+      // 시스템 메시지와 대화 기록 포함
+      let messages = [
         {
-          model: "deepseek/deepseek-r1:free",
-          messages: [
-            {
-              role: "system",
-              content: "당신은 친절하고 도움이 되는 AI 어시스턴트입니다. 한국어로 대화합니다."
-            },
-            {
-              role: "user",
-              content: question
-            }
-          ]
+          role: "system",
+          content: "당신은 친절하고 도움이 되는 AI 어시스턴트입니다. 한국어로 대화하며, 이전 대화 맥락을 기억하고 자연스럽게 대화를 이어갑니다."
         },
+        ...userHistory
+      ];
+
+      // 현재 질문 추가
+      if (imageAttachment) {
+        // 이미지 처리 로직...
+      } else {
+        messages.push({
+          role: "user",
+          content: question
+        });
+      }
+
+      requestBody.messages = messages;
+
+      const response = await axios.post(`${OPENROUTER_BASE_URL}/chat/completions`,
+        requestBody,
         {
           headers: {
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
             'HTTP-Referer': 'https://discord.com',
             'X-Title': 'Discord Bot',
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 30000
         }
       );
 
       const answer = response.data.choices[0].message.content;
-      
+      const responseTime = ((Date.now() - startTime) / 1000).toFixed(1);  // 응답 시간 계산
+
+      // 대화 기록 업데이트
+      userHistory.push(
+        { role: "user", content: question },
+        { role: "assistant", content: answer }
+      );
+      conversationHistory.set(message.author.id, userHistory);
+
       const embed = {
         color: 0x0099ff,
         title: '🤖 AI 응답',
@@ -2891,19 +2935,34 @@ client.on('messageCreate', async (message) => {
           },
           {
             name: '답변',
-            value: answer
+            value: answer.length > 1024 ? answer.slice(0, 1021) + '...' : answer
           }
         ],
         footer: {
-          text: 'Powered by DeepSeek-R1'
+          text: `Powered by Gemini 2.0 • 응답 시간: ${responseTime}초`  // 여기서 사용
         }
       };
+
+      // 긴 답변 처리
+      if (answer.length > 1024) {
+        const chunks = answer.match(/.{1,1024}/g);
+        chunks.slice(1).forEach((chunk, index) => {
+          embed.fields.push({
+            name: `답변 (계속 ${index + 2})`,
+            value: chunk
+          });
+        });
+      }
 
       await loadingMsg.edit({ content: '', embeds: [embed] });
 
     } catch (error) {
       console.error('AI 응답 생성 중 오류:', error);
-      message.reply('죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다.');
+      if (error.code === 'ECONNABORTED') {
+        message.reply('죄송합니다. 응답 시간이 너무 오래 걸려 취소되었습니다.');
+      } else {
+        message.reply('죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다.');
+      }
     }
   }
 });
@@ -4077,15 +4136,36 @@ async function processTTSQueue(guildId) {
 
 // Express 서버 설정 부분 수정
 const app = express();
-const PORT = process.env.PORT || 3000;  // Render는 자체적으로 PORT 환경변수를 제공합니다
+const PORT = process.env.PORT || 3000;
 
-// 서버 시작 부분에 에러 핸들링 추가
-app.listen(PORT, '0.0.0.0', (err) => {  // 모든 IP에서의 접근 허용
+// 기본 라우트 추가
+app.get('/', (req, res) => {
+  res.send('Bot is running!');
+});
+
+// 핑 엔드포인트 추가
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+
+// 서버 시작
+app.listen(PORT, '0.0.0.0', (err) => {
   if (err) {
     console.error('서버 시작 실패:', err);
     return;
   }
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+
+  // 14분마다 자동 핑
+  setInterval(() => {
+    try {
+      axios.get(`${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}/ping`)
+        .then(() => console.log('자동 핑 성공'))
+        .catch(error => console.error('자동 핑 실패:', error));
+    } catch (error) {
+      console.error('자동 핑 오류:', error);
+    }
+  }, 14 * 60 * 1000); // 14분
 }).on('error', (err) => {
   console.error('서버 에러:', err);
 });
