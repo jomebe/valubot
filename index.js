@@ -7,7 +7,6 @@ console.log('OpenAI API Key:', process.env.OPENAI_API_KEY ? '설정됨' : '미�
 // require 구문을 import로 변경
 import { Client, GatewayIntentBits, Events, AttachmentBuilder } from 'discord.js';
 import { createAudioPlayer, createAudioResource, joinVoiceChannel, AudioPlayerStatus, NoSubscriberBehavior, getVoiceConnection, StreamType } from '@discordjs/voice';
-import OpenAI from 'openai';
 import fs from 'fs';
 import axios from 'axios';
 import path from 'path';
@@ -116,14 +115,6 @@ const volumeSettings = new Map();  // Map으로 변경
 
 // 선착순 대기열을 저장할 Map
 const waitingQueues = new Map();
-
-// OpenAI API 키 설정 (본인의 API 키로 교체하세요)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-// OpenAI 초기화 확인
-console.log('OpenAI 초기화:', openai.apiKey ? '성공' : '실패');
 
 // 출석 데이터를 저장할 객체
 let attendanceData = {};
@@ -690,213 +681,6 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // // "ㅂ검색" 명령어 처리 부분 수정
-  // else if (content.startsWith('ㅂ검색') || content.startsWith('ㅂㄱㅅ') || content.startsWith('ㅂㄳ')) {
-  //   const query = content.slice(3).trim();
-  //   if (!query) {
-  //     return message.reply('사용법: ㅂ검색 [검색어]');
-  //   }
-
-  //   const voiceChannel = message.member.voice.channel;
-  //   if (!voiceChannel) {
-  //     return message.reply('음성 채널에 먼저 입장해주세요!');
-  //   }
-
-  //   try {
-  //     const loadingMsg = await message.reply('🔍 검색중...');
-      
-  //     const searchResults = await play.search(query, {
-  //       limit: 5,
-  //       source: { youtube: "video" }
-  //     });
-
-  //     if (!searchResults?.length) {
-  //       return loadingMsg.edit('❌ 검색 결과가 없습니다.');
-  //     }
-
-  //     const embed = {
-  //       color: 0x0099ff,
-  //       title: '🎵 검색 결과',
-  //       description: searchResults.map((video, index) => 
-  //         `${index + 1}. **${video.title}**\n└ 길이: ${video.durationRaw}`
-  //       ).join('\n\n'),
-  //       footer: {
-  //         text: '30초 안에 번호를 입력하세요 (1-5) | 취소하려면 "취소" 입력'
-  //       }
-  //     };
-
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-
-  //     try {
-  //       const filter = m => {
-  //         if (m.author.id !== message.author.id) return false;
-  //         if (m.content.toLowerCase() === '취소') return true;
-  //         const num = parseInt(m.content);
-  //         return !isNaN(num) && num > 0 && num <= searchResults.length;
-  //       };
-
-  //       const collected = await message.channel.awaitMessages({
-  //         filter,
-  //         max: 1,
-  //         time: 30000,
-  //         errors: ['time']
-  //       });
-
-  //       const response = collected.first().content;
-        
-  //       // 취소 입력 시
-  //       if (response.toLowerCase() === '취소') {
-  //         await loadingMsg.edit({ content: '❌ 검색이 취소되었습니다.', embeds: [] });
-  //         return;
-  //       }
-
-  //       const choice = parseInt(response);
-  //       const selectedVideo = searchResults[choice - 1];
-
-  //       const queue = getServerQueue(message.guild.id);
-  //       const song = {
-  //         title: selectedVideo.title,
-  //         url: selectedVideo.url
-  //       };
-
-  //       if (!queue.connection) {
-  //         const connection = joinVoiceChannel({
-  //           channelId: voiceChannel.id,
-  //           guildId: message.guild.id,
-  //           adapterCreator: message.guild.voiceAdapterCreator,
-  //           selfDeaf: false
-  //         });
-
-  //         queue.connection = connection;
-  //         queue.voiceChannel = voiceChannel;
-  //         queue.textChannel = message.channel;
-  //       }
-
-  //       queue.songs.push(song);
-  //       await loadingMsg.edit(`✅ 재생목록에 추가됨: **${song.title}**`);
-
-  //       // 노래 다운로드 시작
-  //       try {
-  //         if (!downloadQueue.has(song.url)) {
-  //           await backgroundDownload(song, message);
-  //         }
-  //       } catch (error) {
-  //         console.error('백그라운드 다운로드 실패:', song.title, error);
-  //       }
-
-  //       if (!queue.playing) {
-  //         queue.playing = true;
-  //         playNext(message.guild.id, message.channel);
-  //       }
-
-  //     } catch (error) {
-  //       await loadingMsg.edit('❌ 30초 안에 선택하지 않아 취소되었습니다.');
-  //     }
-
-  //   } catch (error) {
-  //     console.error('검색 중 오류:', error);
-  //     message.reply(`❌ 오류 발생: ${error.message}`);
-  //   }
-  // }
-
-  // // "ㅂ정지" 명령어 처리
-  // else if (content === 'ㅂ정지') {
-  //   const queue = getServerQueue(message.guild.id);
-  //   if (!queue.player) return message.reply('재생 중인 음악이 없습니다.');
-    
-  //   queue.player.pause();
-  //   message.reply('⏸️ 음악을 일시정지했습니다.');
-  // }
-
-  // // "ㅂ재개" 명령어 처리
-  // else if (content === 'ㅂ재개') {
-  //   const queue = getServerQueue(message.guild.id);
-  //   if (!queue.player) return message.reply('재생 중인 음악이 없습니다.');
-    
-  //   queue.player.unpause();
-  //   message.reply('▶️ 음악을 다시 재생합니다.');
-  // }
-
-  // // "ㅂ스킵" 명령어 처리 수정
-  // else if (content === 'ㅂ스킵') {
-  //   const queue = getServerQueue(message.guild.id);
-  //   if (!queue || !queue.player) return message.reply('❌ 재생 중인 음악이 없습니다.');
-  //   if (queue.songs.length < 2) return message.reply('❌ 다음 곡이 없습니다.');
-    
-  //   const currentSong = queue.songs[0];
-  //   queue.songs.shift();  // 현재 곡만 제거
-    
-  //   // 다음 곡 재생
-  //   playSong(message.guild, queue.songs[0]);
-  //   message.reply(`⏭️ 스킵: **${currentSong.title}**`);
-  // }
-
-  // // "ㅂ대기열" 명령어 처리
-  // else if (content === 'ㅂ대기열') {
-  //   const queue = getServerQueue(message.guild.id);
-  //   if (!queue || !queue.songs.length) {
-  //     return message.reply('재생 대기열이 비어있습니다.');
-  //   }
-
-  //   const queueList = queue.songs.map((song, index) => {
-  //     const downloadInfo = downloadQueue.get(song.url);
-  //     let status = '';
-  //     if (downloadInfo) {
-  //       if (downloadInfo.status === 'completed') {
-  //         status = '✅ 준비됨';
-  //       } else if (downloadInfo.status === 'downloading') {
-  //         status = `⏳ 다운로드 중 (${downloadInfo.progress}%)`;
-  //       }
-  //     } else {
-  //       status = '⌛ 대기 중';
-  //     }
-  //     return `${index === 0 ? '🎵 현재 재생중:' : `${index}.`} **${song.title}** ${status}`;
-  //   }).join('\n');
-
-  //   const embed = {
-  //     color: 0x0099ff,
-  //     title: '🎵 재생 대기열',
-  //     description: queueList
-  //   };
-
-  //   message.reply({ embeds: [embed] });
-  // }
-
-  // // "ㅂ나가기" 명령어 처리
-  // else if (content === 'ㅂ나가기' || content === 'ㅂ나가') {
-  //   const queue = getServerQueue(message.guild.id);
-  //   if (!queue.connection) return message.reply('이미 음성 채널에 없습니다.');
-
-  //   queue.songs = [];
-  //   queue.player?.stop();
-  //   queue.connection.destroy();
-  //   queues.delete(message.guild.id);
-  //   message.reply(' 음성 채널에서 나갔습니다.');
-  // }
-
-  // // "ㅂ볼륨" 명령어 처리
-  // else if (content.startsWith('ㅂ볼륨')) {
-  //   const volume = parseInt(content.split(' ')[1]);
-  //   if (isNaN(volume) || volume < 0 || volume > 100) {
-  //     return message.reply('볼륨은 0에서 100 사이의 숫자로 설정해주세요.');
-  //   }
-
-  //   const queue = getServerQueue(message.guild.id);
-  //   if (!queue) {
-  //     return message.reply('현재 재생 중인 음악이 없습니다.');
-  //   }
-
-  //   // 볼륨 설정 저장
-  //   volumeSettings.set(message.guild.id, volume);
-  //   saveVolumeSettings();  // 볼륨 설정을 파일에 저장
-
-  //   // 현재 재생 중인 음악의 볼륨 조절
-  //   if (queue.player && queue.player.state.resource) {
-  //     queue.player.state.resource.volume.setVolume(volume / 100);
-  //   }
-
-  //   message.reply(`🔊 볼륨이 ${volume}%로 설정되었습니다.`);
-  // }
 
   // "ㅂ선착" 명령어 처리 부분
   else if (content.startsWith('ㅂ선착')) {
@@ -1049,60 +833,6 @@ client.on('messageCreate', async (message) => {
         removeWaitingQueue(message.guild.id);
       }
     });
-  }
-
-  // "ㅂ지피티" 명령어 처리
-  else if (content.startsWith('ㅂ지피티')) {
-    const question = content.slice(4).trim(); // "ㅂ지피티 " 이후의 텍스트 추출
-    
-    if (!question) {
-      return message.reply('사용법: ㅂ지피티 [질문]\n예시: ㅂ지피티 안녕하세요!');
-    }
-
-    try {
-      const loadingMsg = await message.reply('🤔 생각하는 중...');
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "당신은 친절하고 도움이 되는 AI 어시스턴트입니다. 한국어로 대화합니다."
-          },
-          {
-            role: "user",
-            content: question
-          }
-        ],
-        max_tokens: 500
-      });
-
-      const answer = response.choices[0].message.content;
-      
-      const embed = {
-        color: 0x0099ff,
-        title: '🤖 ChatGPT 응답',
-        fields: [
-          {
-            name: '질문',
-            value: question
-          },
-          {
-            name: '답변',
-            value: answer
-          }
-        ],
-        footer: {
-          text: '응답이 길 수 있으니 주의해주세요!'
-        }
-      };
-
-      await loadingMsg.edit({ content: '', embeds: [embed] });
-
-    } catch (error) {
-      console.error('ChatGPT 에러:', error);
-      message.reply('죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다.');
-    }
   }
 
   // "ㅂ출석" 명령어 처리
@@ -1368,11 +1098,11 @@ client.on('messageCreate', async (message) => {
         },
         {
           name: '🎲 게임/재미',
-          value: '`선착` - 선착순 모집\n' +
+          value: '`선착 [인원수] [제목] [멘션여부]` - 선착순 모집\n' +
                  '`선착현황` - 선착순 현황 확인\n' +
                  '`선착취소` - 선착순 모집 취소\n' +
                  '`주사위` - 주사위 굴리기\n' +
-                 '`랜덤` - 랜덤 선택\n' +
+                 '`랜덤 [항목1] [항목2]...` - 랜덤 선택' +
                  '`팀나누기` - 음성채널 인원 팀 나누기'
         },
         {
@@ -1380,7 +1110,10 @@ client.on('messageCreate', async (message) => {
           value: '`전과` - 타임아웃 기록 확인\n' +
                  '`통계` - 서버 활동 통계 확인\n' +
                  '`청소` - 메시지 일괄 삭제\n' +
-                 '`투표` - 투표 생성'
+                 '`투표` - 투표 생성' +
+                 '`출첵` - 출석체크\n' +
+                 '`출첵현황` - 출석 현황 확인\n' +
+                 '`핑` - 봇 지연시간 확인'
         }
       ],
       footer: {
