@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import getMP3Duration from 'get-mp3-duration';
 import { entersState, VoiceConnectionStatus } from '@discordjs/voice';
+import express from 'express';
 
 // ES modules에서 __dirname 사용하기 위한 설정
 const __filename = fileURLToPath(import.meta.url);
@@ -4006,5 +4007,19 @@ async function processTTSQueue(guildId) {
     }
   }
 }
+
+// Express 서버 설정
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 기본 라우트
+app.get('/', (req, res) => {
+  res.send('Bot is running!');
+});
+
+// 서버 시작
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 
 client.login(process.env.DISCORD_TOKEN);
