@@ -2861,14 +2861,14 @@ client.on('messageCreate', async (message) => {
       return message.reply('대화 기록이 초기화되었습니다. 새로운 대화를 시작하세요!');
     }
 
+    let loadingMsg;
     try {
-      const startTime = Date.now();  // 시작 시간 기록
-      const loadingMsg = await message.reply('🤔 생각하는 중...');
+      loadingMsg = await message.reply('🤔 생각하는 중...');
+      const startTime = Date.now();
 
       // 사용자의 대화 기록 가져오기
       let userHistory = conversationHistory.get(message.author.id) || [];
       
-      // 대화 기록이 너무 길면 최근 5개만 유지
       if (userHistory.length > 100) {
         userHistory = userHistory.slice(-50);
       }
@@ -2876,12 +2876,11 @@ client.on('messageCreate', async (message) => {
       const imageAttachment = message.attachments.first();
       let requestBody = {
         model: "google/gemini-2.0-flash-lite-preview-02-05:free",
-        max_tokens: 2000,
+        max_tokens: 1000,
         temperature: 0.8,
         timeout: 30000
       };
 
-      // 시스템 메시지와 대화 기록 포함
       let messages = [
         {
           role: "system",
@@ -2890,7 +2889,6 @@ client.on('messageCreate', async (message) => {
         ...userHistory
       ];
 
-      // 현재 질문 추가
       if (imageAttachment) {
         // 이미지 처리 로직...
       } else {
@@ -2915,8 +2913,12 @@ client.on('messageCreate', async (message) => {
         }
       );
 
+      if (!response.data?.choices?.[0]?.message?.content) {
+        throw new Error('API 응답이 올바르지 않습니다.');
+      }
+
       const answer = response.data.choices[0].message.content;
-      const responseTime = ((Date.now() - startTime) / 1000).toFixed(1);  // 응답 시간 계산
+      const responseTime = ((Date.now() - startTime) / 1000).toFixed(1);
 
       // 대화 기록 업데이트
       userHistory.push(
@@ -2925,43 +2927,36 @@ client.on('messageCreate', async (message) => {
       );
       conversationHistory.set(message.author.id, userHistory);
 
+      // 긴 답변을 여러 메시지로 나누지 않고 한 번에 전송
       const embed = {
         color: 0x0099ff,
         title: '🤖 AI 응답',
-        fields: [
-          {
-            name: '질문',
-            value: question
-          },
-          {
-            name: '답변',
-            value: answer.length > 1024 ? answer.slice(0, 1021) + '...' : answer
-          }
-        ],
+        description: `**질문**\n${question}\n\n**답변**\n${answer}`,
         footer: {
-          text: `Powered by Gemini 2.0 • 응답 시간: ${responseTime}초`  // 여기서 사용
+          text: `Powered by Gemini 2.0 • 응답 시간: ${responseTime}초`
         }
       };
-
-      // 긴 답변 처리
-      if (answer.length > 1024) {
-        const chunks = answer.match(/.{1,1024}/g);
-        chunks.slice(1).forEach((chunk, index) => {
-          embed.fields.push({
-            name: `답변 (계속 ${index + 2})`,
-            value: chunk
-          });
-        });
-      }
 
       await loadingMsg.edit({ content: '', embeds: [embed] });
 
     } catch (error) {
       console.error('AI 응답 생성 중 오류:', error);
-      if (error.code === 'ECONNABORTED') {
-        message.reply('죄송합니다. 응답 시간이 너무 오래 걸려 취소되었습니다.');
-      } else {
-        message.reply('죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다.');
+      
+      const errorMessage = error.response?.data?.error?.message || error.message;
+      console.error('상세 에러 정보:', {
+        message: errorMessage,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      if (loadingMsg) {
+        if (error.code === 'ECONNABORTED') {
+          await loadingMsg.edit('죄송합니다. 응답 시간이 너무 오래 걸려 취소되었습니다.');
+        } else if (error.response?.status === 429) {
+          await loadingMsg.edit('죄송합니다. 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
+        } else {
+          await loadingMsg.edit(`죄송합니다. 오류가 발생했습니다: ${errorMessage}`);
+        }
       }
     }
   }
@@ -4174,3 +4169,4 @@ app.listen(PORT, '0.0.0.0', (err) => {
 client.login(process.env.DISCORD_TOKEN).catch(err => {
   console.error('Discord 봇 로그인 실패:', err);
 });
+
