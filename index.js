@@ -16,6 +16,24 @@ import { dirname } from 'path';
 import getMP3Duration from 'get-mp3-duration';
 import { entersState, VoiceConnectionStatus } from '@discordjs/voice';
 import express from 'express';
+// 기존 import 구문들 아래에 추가
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+
+// 환경변수 로드 후에 Firebase 설정 추가
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
+};
+
+// Firebase 초기화
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
 
 // ES modules에서 __dirname 사용하기 위한 설정
 const __filename = fileURLToPath(import.meta.url);
@@ -126,17 +144,56 @@ const waitingQueues = new Map();
 // 출석 데이터를 저장할 객체
 let attendanceData = {};
 
-// 파일에서 출석 데이터 로드
-try {
-  attendanceData = JSON.parse(fs.readFileSync('./attendance.json', 'utf8'));
-} catch (error) {
-  console.log('출석 데이터 파일이 없습니다. 새로 생성합니다.');
-  fs.writeFileSync('./attendance.json', JSON.stringify(attendanceData));
+// 출석 데이터 로드 함수
+async function loadAttendanceData() {
+  try {
+    // Firebase에서 데이터 로드
+    const docRef = doc(db, 'data', 'attendance');
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      attendanceData = docSnap.data();
+      // Firebase 데이터를 로컬에도 저장
+      fs.writeFileSync('./attendance.json', JSON.stringify(attendanceData, null, 2));
+      console.log('Firebase에서 출석 데이터를 불러왔습니다.');
+    } else {
+      // Firebase에 데이터가 없으면 로컬에서 로드
+      try {
+        const data = fs.readFileSync('./attendance.json', 'utf8');
+        attendanceData = JSON.parse(data);
+        // 로컬 데이터를 Firebase에 저장
+        await setDoc(docRef, attendanceData);
+        console.log('로컬 출석 데이터를 Firebase에 동기화했습니다.');
+      } catch (error) {
+        console.log('출석 데이터 파일이 없습니다. 새로 생성합니다.');
+        attendanceData = {};
+        await setDoc(docRef, {});
+      }
+    }
+  } catch (error) {
+    console.error('출석 데이터 로드 중 오류:', error);
+    try {
+      const data = fs.readFileSync('./attendance.json', 'utf8');
+      attendanceData = JSON.parse(data);
+      console.log('로컬 백업에서 출석 데이터를 불러왔습니다.');
+    } catch (localError) {
+      console.error('로컬 백업 로드 실패:', localError);
+      attendanceData = {};
+    }
+  }
 }
 
 // 출석 데이터 저장 함수
-function saveAttendanceData() {
-  fs.writeFileSync('./attendance.json', JSON.stringify(attendanceData));
+async function saveAttendanceData() {
+  try {
+    // Firebase에 저장
+    await setDoc(doc(db, 'data', 'attendance'), attendanceData);
+    // 로컬 파일에도 저장
+    fs.writeFileSync('./attendance.json', JSON.stringify(attendanceData, null, 2));
+    console.log('출석 데이터 저장 완료 (Firebase + 로컬)');
+  } catch (error) {
+    console.error('출석 데이터 저장 중 오류:', error);
+  }
 }
 
 // 선착순 대기열 관리 함수들
@@ -146,7 +203,8 @@ function createWaitingQueue(guildId, limit, message, isMentionEnabled) {
     limit: limit,
     message: message,
     isOpen: true,
-    isMentionEnabled: isMentionEnabled
+    isMentionEnabled: isMentionEnabled,
+    creatorId: message.author.id  // 생성자 ID 추가
   });
 }
 
@@ -181,32 +239,63 @@ let userStats = {
 // 데이터 파일 경로
 const STATS_FILE = './userStats.json';
 
-// 데이터 로드 함수
-function loadStats() {
+// 데이터 로드 함수 수정
+async function loadStats() {
   try {
-    const data = fs.readFileSync(STATS_FILE, 'utf8');
-    userStats = JSON.parse(data);
-    console.log('통계 데이터를 성공적으로 불러왔습니다.');
+    // Firebase에서 데이터 로드
+    const docRef = doc(db, 'stats', 'user');
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      userStats = docSnap.data();
+      // Firebase 데이터를 로컬에도 저장
+      fs.writeFileSync(STATS_FILE, JSON.stringify(userStats, null, 2));
+      console.log('Firebase에서 통계 데이터를 불러왔습니다.');
+    } else {
+      // Firebase에 데이터가 없으면 로컬에서 로드
+      try {
+        const data = fs.readFileSync(STATS_FILE, 'utf8');
+        userStats = JSON.parse(data);
+        // 로컬 데이터를 Firebase에 저장
+        await setDoc(docRef, userStats);
+        console.log('로컬 통계를 Firebase에 동기화했습니다.');
+      } catch (error) {
+        console.log('통계 데이터 파일이 없습니다. 새로 생성합니다.');
+        userStats = {
+          voiceTime: {},
+          messageCount: {}
+        };
+        await setDoc(docRef, userStats);
+      }
+    }
   } catch (error) {
-    console.log('통계 데이터 파일이 없습니다. 새로 생성합니다.');
-    userStats = {
-      voiceTime: {},
-      messageCount: {}
-    };
-    saveStats();
+    console.error('통계 데이터 로드 중 오류:', error);
+    // 에러 발생 시 로컬 파일 시도
+    try {
+      const data = fs.readFileSync(STATS_FILE, 'utf8');
+      userStats = JSON.parse(data);
+      console.log('로컬 백업에서 통계를 불러왔습니다.');
+    } catch (localError) {
+      console.error('로컬 백업 로드 실패:', localError);
+      userStats = {
+        voiceTime: {},
+        messageCount: {}
+      };
+    }
   }
 }
 
-// 데이터 저장 함수
-function saveStats() {
+// 데이터 저장 함수 수정
+async function saveStats() {
   try {
-    fs.writeFileSync(
-      STATS_FILE,
-      JSON.stringify(userStats, null, 2)
-    );
-    console.log('통계 데이터 저장 완료');
+    // Firebase에 저장
+    await setDoc(doc(db, 'stats', 'user'), userStats);
+    
+    // 로컬 파일에도 저장
+    fs.writeFileSync(STATS_FILE, JSON.stringify(userStats, null, 2));
+    console.log('통계 데이터 저장 완료 (Firebase + 로컬)');
   } catch (error) {
-    console.error('통계 데이터 저장 중 오류 발생:', error);
+    console.error('통계 데이터 저장 중 오류:', error);
   }
 }
 
@@ -217,33 +306,60 @@ const VALORANT_SETTINGS_FILE = './valorantSettings.json';
 let valorantSettings = {};
 
 // 발로란트 설정 로드 함수 수정
-function loadValorantSettings() {
+async function loadValorantSettings() {
   try {
-    const data = fs.readFileSync(VALORANT_SETTINGS_FILE, 'utf8');
-    valorantSettings = JSON.parse(data);
-    console.log('발로란트 설정을 성공적으로 불러왔습니다.');
+    // Firebase에서 데이터 로드
+    const docRef = doc(db, 'settings', 'valorant');
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      valorantSettings = docSnap.data();
+      // Firebase 데이터를 로컬에도 저장
+      fs.writeFileSync(VALORANT_SETTINGS_FILE, JSON.stringify(valorantSettings, null, 2));
+      console.log('Firebase에서 발로란트 설정을 불러왔습니다.');
+    } else {
+      // Firebase에 데이터가 없으면 로컬에서 로드
+      try {
+        const data = fs.readFileSync(VALORANT_SETTINGS_FILE, 'utf8');
+        valorantSettings = JSON.parse(data);
+        // 로컬 데이터를 Firebase에 저장
+        await setDoc(docRef, valorantSettings);
+        console.log('로컬 설정을 Firebase에 동기화했습니다.');
+      } catch (error) {
+        console.log('발로란트 설정 파일이 없습니다. 새로 생성합니다.');
+        valorantSettings = {};
+        await setDoc(docRef, {});
+      }
+    }
     console.log('등록된 계정 수:', Object.keys(valorantSettings).length);
   } catch (error) {
-    console.log('발로란트 설정 파일이 없습니다. 새로 생성합니다.');
-    valorantSettings = {};
-    saveValorantSettings();
+    console.error('발로란트 설정 로드 중 오류:', error);
+    // 에러 발생 시 로컬 파일 시도
+    try {
+      const data = fs.readFileSync(VALORANT_SETTINGS_FILE, 'utf8');
+      valorantSettings = JSON.parse(data);
+      console.log('로컬 백업에서 설정을 불러왔습니다.');
+    } catch (localError) {
+      console.error('로컬 백업 로드 실패:', localError);
+      valorantSettings = {};
+    }
   }
 }
 
 // 발로란트 설정 저장 함수 수정
-function saveValorantSettings() {
+async function saveValorantSettings() {
   try {
-    // 저장 전 데이터 확인
-    console.log('저장할 계정 수:', Object.keys(valorantSettings).length);
-    console.log('저장할 데이터:', valorantSettings);
+    // Firebase에 저장
+    await setDoc(doc(db, 'settings', 'valorant'), valorantSettings);
     
+    // 로컬 파일에도 저장
     fs.writeFileSync(
       VALORANT_SETTINGS_FILE, 
       JSON.stringify(valorantSettings, null, 2)
     );
-    console.log('발로란트 설정 저장 완료');
+    console.log('발로란트 설정 저장 완료 (Firebase + 로컬)');
   } catch (error) {
-    console.error('발로란트 설정 저장 중 오류 발생:', error);
+    console.error('발로란트 설정 저장 중 오류:', error);
   }
 }
 
@@ -346,30 +462,50 @@ async function checkAllPlayersTier() {
 // 24시간마다 티어 체크
 setInterval(checkAllPlayersTier, 24 * 60 * 60 * 1000);
 
-// 파일 상단에 추가
-const TIMEOUT_HISTORY_FILE = './timeoutHistory.json';
-
 // 타임아웃 기록을 저장할 객체
 let timeoutHistoryData = {};
 
-// 타임아웃 기록 로드 함수
-function loadTimeoutHistory() {
+// 타임아웃 기록 로드 함수 추가
+async function loadTimeoutHistory() {
   try {
-    const data = fs.readFileSync(TIMEOUT_HISTORY_FILE, 'utf8');
-    timeoutHistoryData = JSON.parse(data);
-    console.log('타임아웃 기록을 성공적으로 불러왔습니다.');
+    const docRef = doc(db, 'history', 'timeout');
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      Object.assign(timeoutHistory, docSnap.data());
+      fs.writeFileSync('./timeoutHistory.json', JSON.stringify(timeoutHistory, null, 2));
+      console.log('Firebase에서 타임아웃 기록을 불러왔습니다.');
+    } else {
+      try {
+        const data = fs.readFileSync('./timeoutHistory.json', 'utf8');
+        Object.assign(timeoutHistory, JSON.parse(data));
+        await setDoc(docRef, timeoutHistory);
+        console.log('로컬 타임아웃 기록을 Firebase에 동기화했습니다.');
+      } catch (error) {
+        console.log('타임아웃 기록 파일이 없습니다. 새로 생성합니다.');
+        await setDoc(docRef, {});
+      }
+    }
   } catch (error) {
-    console.log('타임아웃 기록 파일이 없습니다. 새로 생성합니다.');
-    saveTimeoutHistory();
+    console.error('타임아웃 기록 로드 중 오류:', error);
+    try {
+      const data = fs.readFileSync('./timeoutHistory.json', 'utf8');
+      Object.assign(timeoutHistory, JSON.parse(data));
+      console.log('로컬 백업에서 타임아웃 기록을 불러왔습니다.');
+    } catch (localError) {
+      console.error('로컬 백업 로드 실패:', localError);
+    }
   }
 }
 
-// 타임아웃 기록 저장 함수
-function saveTimeoutHistory() {
+// 타임아웃 기록 저장 함수 추가
+async function saveTimeoutHistory() {
   try {
-    fs.writeFileSync(TIMEOUT_HISTORY_FILE, JSON.stringify(timeoutHistoryData, null, 2));
+    await setDoc(doc(db, 'history', 'timeout'), timeoutHistory);
+    fs.writeFileSync('./timeoutHistory.json', JSON.stringify(timeoutHistory, null, 2));
+    console.log('타임아웃 기록 저장 완료 (Firebase + 로컬)');
   } catch (error) {
-    console.error('타임아웃 기록 저장 중 오류 발생:', error);
+    console.error('타임아웃 기록 저장 중 오류:', error);
   }
 }
 
@@ -515,7 +651,8 @@ client.on('messageCreate', async (message) => {
         updatedAt: new Date().toISOString()
       };
       
-      saveValorantSettings();
+      // Firebase와 로컬에 동시 저장
+      await saveValorantSettings();
 
       // 티어 역할 업데이트 시도
       try {
@@ -711,31 +848,26 @@ client.on('messageCreate', async (message) => {
     }
 
     // 선착순 취소 명령어 처리
-    if (content === 'ㅂ선착취소') {
+    else if (content === 'ㅂ선착취소') {
       const queue = getWaitingQueue(message.guild.id);
+      
       if (!queue) {
-        return message.reply('진행 중인 선착순이 없습니다.');
+        return message.reply('❌ 현재 진행 중인 선착순이 없습니다.');
       }
 
-      // 첫 번째 참가자가 아닌 경우 취소 불가
-      if (queue.participants[0]?.id !== message.author.id) {
-        return message.reply('❌ 선착순 취소는 첫 번째 참가자만 가능합니다.');
+      // 특정 역할 ID를 가진 사람만 취소 가능
+      const hasRequiredRole = message.member.roles.cache.has('1134446476601344081');
+      // 선착순 생성자 체크
+      const isCreator = queue.creatorId === message.author.id;
+      // 첫 번째 참가자 체크
+      const isFirstParticipant = queue.participants.length > 0 && queue.participants[0].id === message.author.id;
+
+      if (!hasRequiredRole && !isCreator && !isFirstParticipant) {
+        return message.reply('❌ 선착순 취소는 생성자, 첫 번째 참가자, 또는 특정 역할을 가진 사람만 가능합니다.');
       }
 
-      // 선착순 메시지 수정
-      const embed = {
-        color: 0xFF0000,
-        title: queue.message.embeds[0].title,
-        description: '❌ 선착순이 취소되었습니다.',
-        footer: {
-          text: '새로운 선착순을 시작하려면 ㅂ선착 명령어를 사용하세요.'
-        },
-        timestamp: new Date()
-      };
-
-      queue.message.edit({ embeds: [embed] });
       removeWaitingQueue(message.guild.id);
-      return message.reply('선착순 모집이 취소되었습니다.');
+      return message.reply('✅ 선착순이 취소되었습니다.');
     }
 
     // 일반 선착순 모집 처리
@@ -4130,21 +4262,21 @@ async function processTTSQueue(guildId) {
 }
 
 // Express 서버 설정 부분 수정
-const app = express();
+const expressApp = express();
 const PORT = process.env.PORT || 3000;
 
 // 기본 라우트 추가
-app.get('/', (req, res) => {
+expressApp.get('/', (req, res) => {
   res.send('Bot is running!');
 });
 
 // 핑 엔드포인트 추가
-app.get('/ping', (req, res) => {
+expressApp.get('/ping', (req, res) => {
   res.send('pong');
 });
 
 // 서버 시작
-app.listen(PORT, '0.0.0.0', (err) => {
+expressApp.listen(PORT, '0.0.0.0', (err) => {
   if (err) {
     console.error('서버 시작 실패:', err);
     return;
@@ -4169,4 +4301,101 @@ app.listen(PORT, '0.0.0.0', (err) => {
 client.login(process.env.DISCORD_TOKEN).catch(err => {
   console.error('Discord 봇 로그인 실패:', err);
 });
+
+// 타임아웃 관련 코드 수정
+async function handleTimeout(member, duration, reason) {
+  try {
+    const userId = member.id;
+    const username = member.user.tag;
+
+    // 타임아웃 기록 생성/업데이트
+    if (!timeoutHistory[userId]) {
+      timeoutHistory[userId] = {
+        username: username,
+        timeouts: []
+      };
+    }
+
+    const timeoutData = {
+      timestamp: Date.now(),
+      duration: duration,
+      endTime: Date.now() + duration,
+      reason: reason || "미기재"
+    };
+
+    timeoutHistory[userId].timeouts.push(timeoutData);
+
+    // Firebase에 저장
+    await saveTimeoutHistory();
+
+    // 실제 타임아웃 적용
+    await member.timeout(duration, reason);
+    
+    return true;
+  } catch (error) {
+    console.error('타임아웃 처리 중 오류:', error);
+    return false;
+  }
+}
+
+// 출석 체크 함수 수정
+async function handleAttendance(userId, username) {
+  try {
+    const today = new Date().toLocaleDateString('ko-KR');
+    
+    if (!attendanceData[userId]) {
+      attendanceData[userId] = {
+        lastAttendance: today,
+        streak: 1,
+        totalAttendance: 1
+      };
+    } else {
+      const lastDate = new Date(attendanceData[userId].lastAttendance);
+      const currentDate = new Date(today);
+      const diffDays = Math.floor((currentDate - lastDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        // 연속 출석
+        attendanceData[userId].streak++;
+      } else if (diffDays > 1) {
+        // 연속 출석 끊김
+        attendanceData[userId].streak = 1;
+      }
+
+      if (diffDays !== 0) {
+        // 오늘 처음 출석
+        attendanceData[userId].lastAttendance = today;
+        attendanceData[userId].totalAttendance++;
+      }
+    }
+
+    // Firebase에 저장
+    await saveAttendanceData();
+
+    return {
+      streak: attendanceData[userId].streak,
+      total: attendanceData[userId].totalAttendance
+    };
+  } catch (error) {
+    console.error('출석 처리 중 오류:', error);
+    return null;
+  }
+}
+
+// 봇 시작 시 데이터 로드
+client.once('ready', async () => {
+  console.log('봇이 준비되었습니다.');
+  try {
+    await Promise.all([
+      loadValorantSettings(),
+      loadStats(),
+      loadTimeoutHistory(),
+      loadAttendanceData()
+    ]);
+    console.log('모든 데이터 로드 완료');
+  } catch (error) {
+    console.error('데이터 로드 중 오류:', error);
+  }
+});
+
 
