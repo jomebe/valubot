@@ -4393,8 +4393,139 @@ client.once('ready', async () => {
       loadAttendanceData()
     ]);
     console.log('모든 데이터 로드 완료');
+
+    // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
+    client.guilds.cache.forEach(guild => {
+      guild.channels.cache.forEach(channel => {
+        if (channel.type === 2) { // 음성 채널
+          channel.members.forEach(member => {
+            if (!member.user.bot) { // 봇 제외
+              voiceStartTimes.set(member.id, Date.now());
+              console.log(`기존 통화 참여자 기록: ${member.user.tag}`);
+            }
+          });
+        }
+      });
+    });
+
+    // 1분마다 통화 시간 저장
+    setInterval(async () => {
+      try {
+        let updated = false;
+        
+        // 현재 통화 중인 모든 사용자의 시간 업데이트
+        for (const [userId, startTime] of voiceStartTimes) {
+          const duration = 60000; // 1분
+          
+          if (!userStats.voiceTime[userId]) {
+            userStats.voiceTime[userId] = 0;
+          }
+          userStats.voiceTime[userId] += duration;
+          updated = true;
+          
+          // 시작 시간 업데이트
+          voiceStartTimes.set(userId, Date.now());
+        }
+
+        // 변경된 내용이 있을 때만 저장
+        if (updated) {
+          await saveStats();
+          console.log('통화 시간 자동 저장 완료');
+        }
+      } catch (error) {
+        console.error('통화 시간 자동 저장 중 오류:', error);
+      }
+    }, 60000); // 1분마다 실행
+
   } catch (error) {
     console.error('데이터 로드 중 오류:', error);
+  }
+});
+
+// 음성 채널 입장 이벤트 처리
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  const userId = newState.member.id;
+  
+  // 음성 채널 입장
+  if (!oldState.channelId && newState.channelId) {
+    voiceStartTimes.set(userId, Date.now());
+  }
+  // 음성 채널 퇴장
+  else if (oldState.channelId && !newState.channelId) {
+    const startTime = voiceStartTimes.get(userId);
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      
+      // 기존 통화 시간에 추가
+      if (!userStats.voiceTime[userId]) {
+        userStats.voiceTime[userId] = 0;
+      }
+      userStats.voiceTime[userId] += duration;
+      
+      // Firebase와 로컬에 저장
+      await saveStats();
+      
+      // Map에서 시작 시간 제거
+      voiceStartTimes.delete(userId);
+    }
+  }
+  // 채널 이동
+  else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+    const startTime = voiceStartTimes.get(userId);
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      
+      // 기존 통화 시간에 추가
+      if (!userStats.voiceTime[userId]) {
+        userStats.voiceTime[userId] = 0;
+      }
+      userStats.voiceTime[userId] += duration;
+      
+      // 새로운 시작 시간 설정
+      voiceStartTimes.set(userId, Date.now());
+      
+      // Firebase와 로컬에 저장
+      await saveStats();
+    }
+  }
+});
+
+// 봇 종료/재시작 시 처리
+process.on('SIGINT', async () => {
+  try {
+    // userStats 객체가 없으면 초기화
+    if (!userStats) {
+      userStats = {
+        voiceTime: {},
+        messageCount: {}
+      };
+    }
+
+    // voiceTime 객체가 없으면 초기화
+    if (!userStats.voiceTime) {
+      userStats.voiceTime = {};
+    }
+
+    // 모든 진행 중인 통화 시간 저장
+    for (const [userId, startTime] of voiceStartTimes) {
+      try {
+        const duration = Date.now() - startTime;
+        if (!userStats.voiceTime[userId]) {
+          userStats.voiceTime[userId] = 0;
+        }
+        userStats.voiceTime[userId] += duration;
+      } catch (error) {
+        console.error(`사용자 ${userId}의 통화 시간 저장 중 오류:`, error);
+      }
+    }
+    
+    // Firebase와 로컬에 저장
+    await saveStats();
+    console.log('통화 시간 저장 완료');
+  } catch (error) {
+    console.error('봇 종료 처리 중 오류:', error);
+  } finally {
+    process.exit();
   }
 });
 
