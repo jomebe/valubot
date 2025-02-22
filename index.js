@@ -164,8 +164,8 @@ async function loadAttendanceData() {
         // 로컬 데이터를 Firebase에 저장
         await setDoc(docRef, attendanceData);
         console.log('로컬 출석 데이터를 Firebase에 동기화했습니다.');
-      } catch (error) {
-        console.log('출석 데이터 파일이 없습니다. 새로 생성합니다.');
+} catch (error) {
+  console.log('출석 데이터 파일이 없습니다. 새로 생성합니다.');
         attendanceData = {};
         await setDoc(docRef, {});
       }
@@ -253,14 +253,14 @@ async function loadStats() {
       console.log('Firebase에서 통계 데이터를 불러왔습니다.');
     } else {
       // Firebase에 데이터가 없으면 로컬에서 로드
-      try {
-        const data = fs.readFileSync(STATS_FILE, 'utf8');
-        userStats = JSON.parse(data);
+  try {
+    const data = fs.readFileSync(STATS_FILE, 'utf8');
+    userStats = JSON.parse(data);
         // 로컬 데이터를 Firebase에 저장
         await setDoc(docRef, userStats);
         console.log('로컬 통계를 Firebase에 동기화했습니다.');
-      } catch (error) {
-        console.log('통계 데이터 파일이 없습니다. 새로 생성합니다.');
+  } catch (error) {
+    console.log('통계 데이터 파일이 없습니다. 새로 생성합니다.');
         userStats = {
           voiceTime: {},
           messageCount: {}
@@ -319,14 +319,14 @@ async function loadValorantSettings() {
       console.log('Firebase에서 발로란트 설정을 불러왔습니다.');
     } else {
       // Firebase에 데이터가 없으면 로컬에서 로드
-      try {
-        const data = fs.readFileSync(VALORANT_SETTINGS_FILE, 'utf8');
-        valorantSettings = JSON.parse(data);
+  try {
+    const data = fs.readFileSync(VALORANT_SETTINGS_FILE, 'utf8');
+    valorantSettings = JSON.parse(data);
         // 로컬 데이터를 Firebase에 저장
         await setDoc(docRef, valorantSettings);
         console.log('로컬 설정을 Firebase에 동기화했습니다.');
-      } catch (error) {
-        console.log('발로란트 설정 파일이 없습니다. 새로 생성합니다.');
+  } catch (error) {
+    console.log('발로란트 설정 파일이 없습니다. 새로 생성합니다.');
         valorantSettings = {};
         await setDoc(docRef, {});
       }
@@ -481,8 +481,8 @@ async function loadTimeoutHistory() {
         Object.assign(timeoutHistory, JSON.parse(data));
         await setDoc(docRef, timeoutHistory);
         console.log('로컬 타임아웃 기록을 Firebase에 동기화했습니다.');
-      } catch (error) {
-        console.log('타임아웃 기록 파일이 없습니다. 새로 생성합니다.');
+  } catch (error) {
+    console.log('타임아웃 기록 파일이 없습니다. 새로 생성합니다.');
         await setDoc(docRef, {});
       }
     }
@@ -1881,12 +1881,12 @@ client.on('messageCreate', async (message) => {
       const newSettings = {
         ...valorantSettings,  // 기존 데이터 유지
         [discordId]: {       // 새 데이터 추가
-          discordTag: message.author.tag,
-          valorantName: name,
-          valorantTag: tag,
-          region: region,
-          puuid: accountData.puuid,
-          updatedAt: new Date().toISOString()
+        discordTag: message.author.tag,
+        valorantName: name,
+        valorantTag: tag,
+        region: region,
+        puuid: accountData.puuid,
+        updatedAt: new Date().toISOString()
         }
       };
       
@@ -3287,7 +3287,7 @@ async function playNext(guildId, textChannel) {
 
   if (!queue.songs.length) {
     console.log('큐가 비어있어 재생 종료');
-    queue.playing = false;
+      queue.playing = false;
     try {
       cleanupQueue(queue);
       return textChannel.send('🎵 재생목록이 끝났습니다.');
@@ -3340,16 +3340,16 @@ async function playNext(guildId, textChannel) {
 
     queue.player.once(AudioPlayerStatus.Idle, () => {
       console.log('5. 노래 종료, 다음 곡으로');
-      queue.songs.shift();
-      playNext(guildId, textChannel);
-    });
+        queue.songs.shift();
+        playNext(guildId, textChannel);
+      });
 
   } catch (error) {
     console.error('재생 중 오류:', error);
     await textChannel.send(`❌ 재생 오류: ${error.message}`);
-    queue.songs.shift();
-    playNext(guildId, textChannel);
-  }
+          queue.songs.shift();
+          playNext(guildId, textChannel);
+        }
 }
 
 // 다운로드 확인 및 대기 함수 추가
@@ -3380,7 +3380,7 @@ async function ensureDownloaded(song, textChannel) {
     if (progressMsg) {
       try {
         await progressMsg.delete();
-      } catch (error) {
+  } catch (error) {
         console.error('진행 메시지 삭제 실패:', error);
       }
     }
@@ -3509,7 +3509,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
           title: song.title
         });
         console.log(`기존 파일 사용: ${song.title}`);
-        return;
+      return;
       }
     } catch (error) {
       try {
@@ -3523,7 +3523,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
   try {
     console.log(`다운로드 시작: ${song.title}`);
     const progressMsg = await message.channel.send(`⏳ **${song.title}** 다운로드 중... (취소하려면 '취소' 입력)`);
-    
+
     downloadQueue.set(song.url, {
       status: 'downloading',
       filePath: filePath,
@@ -3552,7 +3552,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
           if (fs.existsSync(filePath)) {
             try {
               const buffer = fs.readFileSync(filePath);
-              const duration = getMP3Duration(buffer);
+            const duration = getMP3Duration(buffer);
               if (duration > 0) {
                 downloadQueue.set(song.url, {
                   status: 'completed',
@@ -3607,7 +3607,7 @@ async function backgroundDownload(song, message) {  // message 매개변수 추�
       collector.stop();
     }
 
-  } catch (error) {
+      } catch (error) {
     if (error.message === 'Download cancelled by user' || isCancelled) {
       return;  // 취소된 경우 조용히 반환
     }
@@ -4213,7 +4213,7 @@ async function processTTSQueue(guildId) {
         } catch (error) {
           console.error('Temp file cleanup error:', error);
         }
-        resolve();
+          resolve();
       });
 
       player.on('error', error => {
@@ -4311,7 +4311,7 @@ function startExpressServer() {
         axios.get(pingUrl)
           .then(() => console.log('자동 핑 성공'))
           .catch(error => console.error('자동 핑 실패:', error));
-      } catch (error) {
+  } catch (error) {
         console.error('자동 핑 오류:', error);
       }
     }, 14 * 60 * 1000);
