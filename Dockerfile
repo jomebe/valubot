@@ -12,24 +12,32 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js 바이너리 확인
+# Node.js 설치 확인
 RUN which node && \
     ls -l $(which node) && \
-    node --version
+    node --version && \
+    echo "Node.js location verified"
 
 WORKDIR /app
 
-# package.json과 package-lock.json 복사
+# package.json 복사 및 의존성 설치
 COPY package*.json ./
-
-# 의존성 설치
 RUN npm install --no-package-lock
 
-# 소스 코드 복사 전에 node 이름 충돌 확인
-RUN find . -name "node" -type f -o -type d
+# 소스 코드 복사 전 디렉토리 확인
+RUN echo "Current directory contents:" && \
+    ls -la && \
+    echo "Checking for 'node' conflicts:" && \
+    find . -name "node" -type f -o -type d
 
 # 소스 코드 복사
 COPY . .
+
+# 복사 후 디렉토리 확인
+RUN echo "After copy, directory contents:" && \
+    ls -la && \
+    echo "Checking again for 'node' conflicts:" && \
+    find . -name "node" -type f -o -type d
 
 # 환경 변수 설정
 ENV NODE_ENV=production
@@ -39,5 +47,11 @@ ENV PATH=/usr/local/bin:$PATH
 ENV PORT=10000
 EXPOSE 10000
 
-# Node.js로 직접 실행
-CMD ["/usr/local/bin/node", "index.js"] 
+# 시작 스크립트 생성
+RUN echo '#!/bin/sh' > /usr/local/bin/start-app && \
+    echo 'echo "Starting app with Node.js from: $(which node)"' >> /usr/local/bin/start-app && \
+    echo 'exec /usr/local/bin/node /app/index.js' >> /usr/local/bin/start-app && \
+    chmod +x /usr/local/bin/start-app
+
+# 시작 스크립트로 실행
+CMD ["/usr/local/bin/start-app"] 
