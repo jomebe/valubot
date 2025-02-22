@@ -4265,42 +4265,58 @@ async function processTTSQueue(guildId) {
 const expressApp = express();
 const PORT = process.env.PORT || 3000;
 
-// 기본 라우트 추가
-expressApp.get('/', (req, res) => {
-  res.send('Bot is running!');
-});
+console.log('환경변수 확인:');
+console.log('PORT:', process.env.PORT);
+console.log('RAILWAY_PUBLIC_DOMAIN:', process.env.RAILWAY_PUBLIC_DOMAIN);
 
-// 핑 엔드포인트 추가
-expressApp.get('/ping', (req, res) => {
-  res.send('pong');
-});
+// Discord 봇 로그인 먼저 시도
+console.log('Discord 봇 로그인 시도...');
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => {
+    console.log('Discord 봇 로그인 성공!');
+    startExpressServer();  // 봇 로그인 성공 후 서버 시작
+  })
+  .catch(err => {
+    console.error('Discord 봇 로그인 실패:', err);
+    process.exit(1);
+  });
 
-// 서버 시작
-expressApp.listen(PORT, '0.0.0.0', (err) => {
-  if (err) {
-    console.error('서버 시작 실패:', err);
-    return;
-  }
-  console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+// Express 서버 시작 함수
+function startExpressServer() {
+  // 기본 라우트 추가
+  expressApp.get('/', (req, res) => {
+    res.send('Bot is running!');
+  });
 
-  // 14분마다 자동 핑
-  setInterval(() => {
-    try {
-      axios.get(`${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}/ping`)
-        .then(() => console.log('자동 핑 성공'))
-        .catch(error => console.error('자동 핑 실패:', error));
-    } catch (error) {
-      console.error('자동 핑 오류:', error);
+  // 핑 엔드포인트 추가
+  expressApp.get('/ping', (req, res) => {
+    res.send('pong');
+  });
+
+  // 서버 시작
+  expressApp.listen(PORT, '0.0.0.0', (err) => {
+    if (err) {
+      console.error('서버 시작 실패:', err);
+      return;
     }
-  }, 14 * 60 * 1000); // 14분
-}).on('error', (err) => {
-  console.error('서버 에러:', err);
-});
+    console.log(`Express 서버가 포트 ${PORT}에서 실행 중입니다`);
 
-// Discord 봇 로그인 부분에 에러 핸들링 추가
-client.login(process.env.DISCORD_TOKEN).catch(err => {
-  console.error('Discord 봇 로그인 실패:', err);
-});
+    // 14분마다 자동 핑
+    setInterval(() => {
+      try {
+        console.log('자동 핑 시도...');
+        const pingUrl = `${process.env.RAILWAY_PUBLIC_DOMAIN}/ping`;
+        console.log('핑 URL:', pingUrl);
+        
+        axios.get(pingUrl)
+          .then(() => console.log('자동 핑 성공'))
+          .catch(error => console.error('자동 핑 실패:', error));
+      } catch (error) {
+        console.error('자동 핑 오류:', error);
+      }
+    }, 14 * 60 * 1000);
+  });
+}
 
 // 타임아웃 관련 코드 수정
 async function handleTimeout(member, duration, reason) {
