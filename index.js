@@ -1757,9 +1757,16 @@ client.on('messageCreate', async (message) => {
       currentVoiceTimes[userId] = (currentVoiceTimes[userId] || 0) + duration;
     });
 
+    // 멤버 정보 미리 가져오기
+    await message.guild.members.fetch();
+
     const sortedUsers = Object.entries(currentVoiceTimes)
+      .filter(([userId]) => {
+        const member = message.guild.members.cache.get(userId);
+        return member && !member.roles.cache.has('1089029768944558092');
+      })
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 12);  // 10 -> 12로 수정
+      .slice(0, 12);
 
     if (sortedUsers.length === 0) {
       return message.reply('아직 통화 기록이 없습니다.');
@@ -1768,7 +1775,7 @@ client.on('messageCreate', async (message) => {
     const embed = {
       color: 0x0099ff,
       title: '🎤 통화방 이용 순위',
-      description: '가장 오래 통화한 상위 12명',  // 10 -> 12로 수정
+      description: '가장 오래 통화한 상위 12명',
       fields: sortedUsers.map(([userId, time], index) => ({
         name: `${index + 1}위`,
         value: `<@${userId}>\n${formatDuration(time)}`,
@@ -1785,9 +1792,16 @@ client.on('messageCreate', async (message) => {
 
   // "ㅂ메시지순위" 명령어 처리
   else if (content === 'ㅂ메시지순위' || content === 'ㅂㅁㅅㅈㅅㅇ') {
+    // 멤버 정보 미리 가져오기
+    await message.guild.members.fetch();
+
     const sortedUsers = Object.entries(userStats.messageCount)
+      .filter(([userId]) => {
+        const member = message.guild.members.cache.get(userId);
+        return member && !member.roles.cache.has('1089029768944558092');
+      })
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 12);  // 10 -> 12로 수정
+      .slice(0, 12);
 
     if (sortedUsers.length === 0) {
       return message.reply('아직 메시지 기록이 없습니다.');
@@ -1796,7 +1810,7 @@ client.on('messageCreate', async (message) => {
     const embed = {
       color: 0x0099ff,
       title: '💬 메시지 전송 순위',
-      description: '가장 많은 메시지를 보낸 상위 12명',  // 10 -> 12로 수정
+      description: '가장 많은 메시지를 보낸 상위 12명',
       fields: sortedUsers.map(([userId, count], index) => ({
         name: `${index + 1}위`,
         value: `<@${userId}>\n${count}개의 메시지`,
