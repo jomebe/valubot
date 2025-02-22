@@ -21,7 +21,11 @@ COPY . .
 
 ENV NODE_ENV=production
 
-ENV PATH /usr/local/bin:$PATH
+# Node.js 실행 파일 경로 확인 및 설정
+RUN which node > /usr/local/bin/node-path && \
+    echo '#!/bin/sh' > /usr/local/bin/node-wrapper && \
+    echo "$(cat /usr/local/bin/node-path) \"\$@\"" >> /usr/local/bin/node-wrapper && \
+    chmod +x /usr/local/bin/node-wrapper
 
-# ENTRYPOINT 제거하고 CMD만 사용
-CMD ["node", "index.js"] 
+# node-wrapper를 사용하여 실행
+CMD ["/usr/local/bin/node-wrapper", "index.js"] 
