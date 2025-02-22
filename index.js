@@ -4449,6 +4449,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   // 음성 채널 입장
   if (!oldState.channelId && newState.channelId) {
     voiceStartTimes.set(userId, Date.now());
+    console.log(`${newState.member.user.tag} 음성 채널 입장`);
   }
   // 음성 채널 퇴장
   else if (oldState.channelId && !newState.channelId) {
@@ -4464,6 +4465,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       
       // Firebase와 로컬에 저장
       await saveStats();
+      console.log(`${newState.member.user.tag} 음성 채널 퇴장 (${Math.floor(duration / 1000)}초)`);
       
       // Map에서 시작 시간 제거
       voiceStartTimes.delete(userId);
@@ -4471,22 +4473,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   }
   // 채널 이동
   else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-    const startTime = voiceStartTimes.get(userId);
-    if (startTime) {
-      const duration = Date.now() - startTime;
-      
-      // 기존 통화 시간에 추가
-      if (!userStats.voiceTime[userId]) {
-        userStats.voiceTime[userId] = 0;
-      }
-      userStats.voiceTime[userId] += duration;
-      
-      // 새로운 시작 시간 설정
-      voiceStartTimes.set(userId, Date.now());
-      
-      // Firebase와 로컬에 저장
-      await saveStats();
-    }
+    // 채널 이동 시에는 시간을 계속 유지
+    console.log(`${newState.member.user.tag} 채널 이동`);
   }
 });
 
