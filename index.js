@@ -4544,3 +4544,27 @@ process.on('SIGINT', async () => {
     process.exit();
   }
 });
+
+// 서버 시작 전에 포트 사용 여부 확인
+const startServer = () => {
+  return new Promise((resolve, reject) => {
+    const server = expressApp.listen(PORT, '0.0.0.0', (err) => {
+      if (err) {
+        console.error('서버 시작 실패:', err);
+        reject(err);
+        return;
+      }
+      console.log(`Express 서버가 포트 ${PORT}에서 실행 중입니다`);
+      resolve(server);
+    }).on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`포트 ${PORT}가 사용 중입니다. 다른 포트로 시도합니다...`);
+        server.close();
+        startServer(PORT + 1);
+      } else {
+        console.error('서버 에러:', err);
+        reject(err);
+      }
+    });
+  });
+};

@@ -22,6 +22,8 @@ RUN npm install --no-package-lock
 COPY . .
 
 ENV NODE_ENV=production
+# Node.js PATH 설정 추가
+ENV PATH /usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/runner/externals/node20/bin:$PATH
 
 # npm start 명령어로 실행
 CMD ["npm", "start"] 
