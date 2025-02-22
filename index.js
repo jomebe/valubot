@@ -3409,19 +3409,76 @@ function cleanupQueue(queue) {
 
 // 봇 시작 시 초기화 실행
 client.once('ready', async () => {
-  console.log(`로그인 완료: ${client.user.tag}`);
-  
-  // 통계 데이터 로드
-  loadStats();
-  console.log('통계 데이터를 성공적으로 불러왔습니다.');
-  
-  // 발로란트 설정 로드
-  loadValorantSettings();
-  console.log('발로란트 설정을 성공적으로 불러왔습니다.');
-  console.log(`등록된 계정 수: ${Object.keys(valorantSettings).length}`);
-  
-  console.log('초기화 완료');
+  try {
+    console.log(`Discord 봇 로그인 성공: ${client.user.tag}`);
+    
+    // 봇 상태 설정
+    client.user.setPresence({
+      activities: [{ 
+        name: 'ㅂ도움 | VALUBOT v1.2.0',
+        type: 0  // PLAYING
+      }],
+      status: 'online'
+    });
+
+    // 데이터 로드
+    await Promise.all([
+      loadValorantSettings(),
+      loadStats(),
+      loadTimeoutHistory(),
+      loadAttendanceData()
+    ]);
+    console.log('모든 데이터 로드 완료');
+
+    // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
+    client.guilds.cache.forEach(guild => {
+      guild.channels.cache.forEach(channel => {
+        if (channel.type === 2) { // 음성 채널
+          channel.members.forEach(member => {
+            if (!member.user.bot) { // 봇 제외
+              voiceStartTimes.set(member.id, Date.now());
+              console.log(`기존 통화 참여자 기록: ${member.user.tag}`);
+            }
+          });
+        }
+      });
+    });
+
+    // 1분마다 통화 시간 저장
+    setInterval(async () => {
+      try {
+        let updated = false;
+        for (const [userId, startTime] of voiceStartTimes) {
+          const duration = 60000; // 1분
+          if (!userStats.voiceTime[userId]) {
+            userStats.voiceTime[userId] = 0;
+          }
+          userStats.voiceTime[userId] += duration;
+          updated = true;
+          voiceStartTimes.set(userId, Date.now());
+        }
+
+        if (updated) {
+          await saveStats();
+          console.log('통화 시간 자동 저장 완료');
+        }
+      } catch (error) {
+        console.error('통화 시간 자동 저장 중 오류:', error);
+      }
+    }, 60000);
+
+  } catch (error) {
+    console.error('봇 초기화 중 오류:', error);
+  }
 });
+
+// Discord 봇 로그인 부분 수정
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => console.log('Discord 봇 로그인 시도 중...'))
+  .catch(err => {
+    console.error('Discord 봇 로그인 실패:', err);
+    process.exit(1);  // 로그인 실패 시 프로세스 종료
+  });
 
 // 검색 함수에 딜레이 추가
 async function searchVideo(query) {
@@ -4297,11 +4354,6 @@ expressApp.listen(PORT, '0.0.0.0', (err) => {
   console.error('서버 에러:', err);
 });
 
-// Discord 봇 로그인 부분에 에러 핸들링 추가
-client.login(process.env.DISCORD_TOKEN).catch(err => {
-  console.error('Discord 봇 로그인 실패:', err);
-});
-
 // 타임아웃 관련 코드 수정
 async function handleTimeout(member, duration, reason) {
   try {
@@ -4381,102 +4433,6 @@ async function handleAttendance(userId, username) {
     return null;
   }
 }
-
-// 봇 시작 시 데이터 로드
-client.once('ready', async () => {
-  console.log('봇이 준비되었습니다.');
-  try {
-    await Promise.all([
-      loadValorantSettings(),
-      loadStats(),
-      loadTimeoutHistory(),
-      loadAttendanceData()
-    ]);
-    console.log('모든 데이터 로드 완료');
-
-    // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
-    client.guilds.cache.forEach(guild => {
-      guild.channels.cache.forEach(channel => {
-        if (channel.type === 2) { // 음성 채널
-          channel.members.forEach(member => {
-            if (!member.user.bot) { // 봇 제외
-              voiceStartTimes.set(member.id, Date.now());
-              console.log(`기존 통화 참여자 기록: ${member.user.tag}`);
-            }
-          });
-        }
-      });
-    });
-
-    // 1분마다 통화 시간 저장
-    setInterval(async () => {
-      try {
-        let updated = false;
-        
-        // 현재 통화 중인 모든 사용자의 시간 업데이트
-        for (const [userId, startTime] of voiceStartTimes) {
-          const duration = 60000; // 1분
-          
-          if (!userStats.voiceTime[userId]) {
-            userStats.voiceTime[userId] = 0;
-          }
-          userStats.voiceTime[userId] += duration;
-          updated = true;
-          
-          // 시작 시간 업데이트
-          voiceStartTimes.set(userId, Date.now());
-        }
-
-        // 변경된 내용이 있을 때만 저장
-        if (updated) {
-          await saveStats();
-          console.log('통화 시간 자동 저장 완료');
-        }
-      } catch (error) {
-        console.error('통화 시간 자동 저장 중 오류:', error);
-      }
-    }, 60000); // 1분마다 실행
-
-  } catch (error) {
-    console.error('데이터 로드 중 오류:', error);
-  }
-});
-
-// 음성 채널 입장 이벤트 처리
-client.on('voiceStateUpdate', async (oldState, newState) => {
-  const userId = newState.member.id;
-  
-  // 음성 채널 입장
-  if (!oldState.channelId && newState.channelId) {
-    voiceStartTimes.set(userId, Date.now());
-    console.log(`${newState.member.user.tag} 음성 채널 입장`);
-  }
-  // 음성 채널 퇴장
-  else if (oldState.channelId && !newState.channelId) {
-    const startTime = voiceStartTimes.get(userId);
-    if (startTime) {
-      const duration = Date.now() - startTime;
-      
-      // 기존 통화 시간에 추가
-      if (!userStats.voiceTime[userId]) {
-        userStats.voiceTime[userId] = 0;
-      }
-      userStats.voiceTime[userId] += duration;
-      
-      // Firebase와 로컬에 저장
-      await saveStats();
-      console.log(`${newState.member.user.tag} 음성 채널 퇴장 (${Math.floor(duration / 1000)}초)`);
-      
-      // Map에서 시작 시간 제거
-      voiceStartTimes.delete(userId);
-    }
-  }
-  // 채널 이동
-  else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-    // 채널 이동 시에는 시간을 계속 유지
-    console.log(`${newState.member.user.tag} 채널 이동`);
-  }
-});
 
 // 봇 종료/재시작 시 처리
 process.on('SIGINT', async () => {

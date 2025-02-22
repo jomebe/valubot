@@ -3,8 +3,8 @@
     "username": "jombee.c",
     "timeouts": [
       {
-        "duration": 604799585,
         "endTime": 1740058659393,
+        "duration": 604799585,
         "reason": "미기재",
         "timestamp": 1739453859808
       }
