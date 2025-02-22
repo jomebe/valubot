@@ -1,13 +1,13 @@
 {
   "820221944728780840": {
-    "username": "jombee.c",
     "timeouts": [
       {
-        "timestamp": 1739453859808,
-        "reason": "미기재",
         "endTime": 1740058659393,
-        "duration": 604799585
+        "timestamp": 1739453859808,
+        "duration": 604799585,
+        "reason": "미기재"
       }
-    ]
+    ],
+    "username": "jombee.c"
   }
 }

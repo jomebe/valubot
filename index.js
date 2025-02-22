@@ -4327,39 +4327,42 @@ console.log('PORT:', process.env.PORT);
 console.log('DISCORD_TOKEN:', process.env.DISCORD_TOKEN ? '설정됨' : '미설정');
 console.log('RENDER_EXTERNAL_URL:', process.env.RENDER_EXTERNAL_URL);
 
-// Discord 봇 로그인 먼저 시도
-console.log('Discord 봇 로그인 시도...');
-client.login(process.env.DISCORD_TOKEN)
-  .then(() => {
+// Express 서버 먼저 시작
+function startServer() {
+  return new Promise((resolve, reject) => {
+    const server = expressApp.listen(PORT, '0.0.0.0', () => {
+      console.log(`Express 서버가 포트 ${PORT}에서 실행 중입니다`);
+      resolve(server);
+    }).on('error', (err) => {
+      console.error('Express 서버 에러:', err);
+      reject(err);
+    });
+
+    // 기본 라우트 추가
+    expressApp.get('/', (req, res) => {
+      res.send('Bot is running!');
+    });
+
+    // 핑 엔드포인트 추가
+    expressApp.get('/ping', (req, res) => {
+      res.send('pong');
+    });
+  });
+}
+
+// 서버 시작 후 봇 로그인
+async function init() {
+  try {
+    // 서버 먼저 시작
+    await startServer();
+    console.log('서버 시작 완료');
+
+    // 봇 로그인
+    console.log('Discord 봇 로그인 시도...');
+    await client.login(process.env.DISCORD_TOKEN);
     console.log('Discord 봇 로그인 성공!');
-    startExpressServer();  // 봇 로그인 성공 후 서버 시작
-  })
-  .catch(err => {
-    console.error('Discord 봇 로그인 실패:', err);
-    process.exit(1);
-  });
 
-// Express 서버 시작 함수
-function startExpressServer() {
-  // 기본 라우트 추가
-  expressApp.get('/', (req, res) => {
-    res.send('Bot is running!');
-  });
-
-  // 핑 엔드포인트 추가
-  expressApp.get('/ping', (req, res) => {
-    res.send('pong');
-  });
-
-  // 서버 시작
-  expressApp.listen(PORT, '0.0.0.0', (err) => {
-    if (err) {
-      console.error('서버 시작 실패:', err);
-      return;
-    }
-    console.log(`Express 서버가 포트 ${PORT}에서 실행 중입니다`);
-
-    // 14분마다 자동 핑
+    // 자동 핑 설정
     setInterval(() => {
       try {
         console.log('자동 핑 시도...');
@@ -4376,12 +4379,17 @@ function startExpressServer() {
         console.error('자동 핑 실행 오류:', error);
       }
     }, 14 * 60 * 1000);
-  }).on('error', (err) => {
-    console.error('Express 서버 에러:', err);
-  });
+
+  } catch (error) {
+    console.error('초기화 중 오류 발생:', error);
+    process.exit(1);
+  }
 }
 
-// 에러 핸들링 추가
+// 초기화 시작
+init();
+
+// 에러 핸들링
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled promise rejection:', error);
 });
