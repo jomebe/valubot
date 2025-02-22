@@ -4320,7 +4320,7 @@ async function processTTSQueue(guildId) {
 
 // Express 서버 설정 부분 수정
 const expressApp = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;  // Render가 제공하는 PORT 환경변수 사용
 
 // 기본 라우트 추가
 expressApp.get('/', (req, res) => {
@@ -4340,18 +4340,26 @@ expressApp.listen(PORT, '0.0.0.0', (err) => {
   }
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
 
+  // 봇 로그인 시도
+  client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+      console.log('Discord 봇 로그인 시도 중...');
+    })
+    .catch(err => {
+      console.error('Discord 봇 로그인 실패:', err);
+      process.exit(1);
+    });
+
   // 14분마다 자동 핑
   setInterval(() => {
     try {
-      axios.get(`${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}/ping`)
+      axios.get(`${process.env.RENDER_EXTERNAL_URL}/ping`)
         .then(() => console.log('자동 핑 성공'))
         .catch(error => console.error('자동 핑 실패:', error));
     } catch (error) {
       console.error('자동 핑 오류:', error);
     }
-  }, 14 * 60 * 1000); // 14분
-}).on('error', (err) => {
-  console.error('서버 에러:', err);
+  }, 14 * 60 * 1000);
 });
 
 // 타임아웃 관련 코드 수정
