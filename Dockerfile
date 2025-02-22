@@ -10,6 +10,12 @@ RUN apk add --no-cache \
     opus-dev \
     ffmpeg
 
+# Node.js 설치 확인 및 권한 설정
+RUN which node && \
+    chmod +x /usr/local/bin/node && \
+    ln -sf /usr/local/bin/node /usr/bin/node && \
+    node --version
+
 # 작업 디렉토리 설정
 WORKDIR /usr/src/app
 
@@ -23,7 +29,12 @@ COPY . .
 # 환경 변수 설정
 ENV NODE_ENV=production
 ENV PORT=10000
+ENV PATH="/usr/local/bin:${PATH}"
 
-# 실행 명령 설정
-ENTRYPOINT ["node"]
-CMD ["index.js"] 
+# 시작 스크립트 생성
+RUN echo '#!/bin/sh' > /usr/local/bin/start.sh && \
+    echo 'exec /usr/local/bin/node /usr/src/app/index.js' >> /usr/local/bin/start.sh && \
+    chmod +x /usr/local/bin/start.sh
+
+# 실행 명령
+CMD ["/usr/local/bin/start.sh"] 
