@@ -1759,7 +1759,7 @@ client.on('messageCreate', async (message) => {
 
     const sortedUsers = Object.entries(currentVoiceTimes)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 10);
+      .slice(0, 12);  // 10 -> 12로 수정
 
     if (sortedUsers.length === 0) {
       return message.reply('아직 통화 기록이 없습니다.');
@@ -1768,7 +1768,7 @@ client.on('messageCreate', async (message) => {
     const embed = {
       color: 0x0099ff,
       title: '🎤 통화방 이용 순위',
-      description: '가장 오래 통화한 상위 10명',
+      description: '가장 오래 통화한 상위 12명',  // 10 -> 12로 수정
       fields: sortedUsers.map(([userId, time], index) => ({
         name: `${index + 1}위`,
         value: `<@${userId}>\n${formatDuration(time)}`,
@@ -1787,7 +1787,7 @@ client.on('messageCreate', async (message) => {
   else if (content === 'ㅂ메시지순위' || content === 'ㅂㅁㅅㅈㅅㅇ') {
     const sortedUsers = Object.entries(userStats.messageCount)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 10);
+      .slice(0, 12);  // 10 -> 12로 수정
 
     if (sortedUsers.length === 0) {
       return message.reply('아직 메시지 기록이 없습니다.');
@@ -1796,7 +1796,7 @@ client.on('messageCreate', async (message) => {
     const embed = {
       color: 0x0099ff,
       title: '💬 메시지 전송 순위',
-      description: '가장 많은 메시지를 보낸 상위 10명',
+      description: '가장 많은 메시지를 보낸 상위 12명',  // 10 -> 12로 수정
       fields: sortedUsers.map(([userId, count], index) => ({
         name: `${index + 1}위`,
         value: `<@${userId}>\n${count}개의 메시지`,
