@@ -12,6 +12,11 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# Node.js 바이너리 확인
+RUN which node && \
+    ls -l $(which node) && \
+    node --version
+
 WORKDIR /app
 
 # package.json과 package-lock.json 복사
@@ -20,16 +25,19 @@ COPY package*.json ./
 # 의존성 설치
 RUN npm install --no-package-lock
 
+# 소스 코드 복사 전에 node 이름 충돌 확인
+RUN find . -name "node" -type f -o -type d
+
 # 소스 코드 복사
 COPY . .
 
 # 환경 변수 설정
 ENV NODE_ENV=production
-ENV PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/home/runner/externals/node20/bin:$PATH
+ENV PATH=/usr/local/bin:$PATH
 
 # 포트 설정
 ENV PORT=10000
 EXPOSE 10000
 
-# 앱 실행
-CMD ["npm", "start"] 
+# Node.js로 직접 실행
+CMD ["/usr/local/bin/node", "index.js"] 
