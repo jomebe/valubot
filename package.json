@@ -15,6 +15,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "postinstall": "npm install --no-package-lock"
   }
 }
