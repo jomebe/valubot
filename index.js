@@ -4320,165 +4320,74 @@ async function processTTSQueue(guildId) {
 
 // Express 서버 설정 부분 수정
 const expressApp = express();
-const PORT = process.env.PORT || 10000;  // Render가 제공하는 PORT 환경변수 사용
+const PORT = process.env.PORT || 10000;
 
-// 기본 라우트 추가
-expressApp.get('/', (req, res) => {
-  res.send('Bot is running!');
-});
+console.log('환경변수 확인:');
+console.log('PORT:', process.env.PORT);
+console.log('DISCORD_TOKEN:', process.env.DISCORD_TOKEN ? '설정됨' : '미설정');
+console.log('RENDER_EXTERNAL_URL:', process.env.RENDER_EXTERNAL_URL);
 
-// 핑 엔드포인트 추가
-expressApp.get('/ping', (req, res) => {
-  res.send('pong');
-});
+// Discord 봇 로그인 먼저 시도
+console.log('Discord 봇 로그인 시도...');
+client.login(process.env.DISCORD_TOKEN)
+  .then(() => {
+    console.log('Discord 봇 로그인 성공!');
+    startExpressServer();  // 봇 로그인 성공 후 서버 시작
+  })
+  .catch(err => {
+    console.error('Discord 봇 로그인 실패:', err);
+    process.exit(1);
+  });
 
-// 서버 시작
-expressApp.listen(PORT, '0.0.0.0', (err) => {
-  if (err) {
-    console.error('서버 시작 실패:', err);
-    return;
-  }
-  console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+// Express 서버 시작 함수
+function startExpressServer() {
+  // 기본 라우트 추가
+  expressApp.get('/', (req, res) => {
+    res.send('Bot is running!');
+  });
 
-  // 봇 로그인 시도
-  client.login(process.env.DISCORD_TOKEN)
-    .then(() => {
-      console.log('Discord 봇 로그인 시도 중...');
-    })
-    .catch(err => {
-      console.error('Discord 봇 로그인 실패:', err);
-      process.exit(1);
-    });
+  // 핑 엔드포인트 추가
+  expressApp.get('/ping', (req, res) => {
+    res.send('pong');
+  });
 
-  // 14분마다 자동 핑
-  setInterval(() => {
-    try {
-      axios.get(`${process.env.RENDER_EXTERNAL_URL}/ping`)
-        .then(() => console.log('자동 핑 성공'))
-        .catch(error => console.error('자동 핑 실패:', error));
-    } catch (error) {
-      console.error('자동 핑 오류:', error);
+  // 서버 시작
+  expressApp.listen(PORT, '0.0.0.0', (err) => {
+    if (err) {
+      console.error('서버 시작 실패:', err);
+      return;
     }
-  }, 14 * 60 * 1000);
-});
+    console.log(`Express 서버가 포트 ${PORT}에서 실행 중입니다`);
 
-// 타임아웃 관련 코드 수정
-async function handleTimeout(member, duration, reason) {
-  try {
-    const userId = member.id;
-    const username = member.user.tag;
-
-    // 타임아웃 기록 생성/업데이트
-    if (!timeoutHistory[userId]) {
-      timeoutHistory[userId] = {
-        username: username,
-        timeouts: []
-      };
-    }
-
-    const timeoutData = {
-      timestamp: Date.now(),
-      duration: duration,
-      endTime: Date.now() + duration,
-      reason: reason || "미기재"
-    };
-
-    timeoutHistory[userId].timeouts.push(timeoutData);
-
-    // Firebase에 저장
-    await saveTimeoutHistory();
-
-    // 실제 타임아웃 적용
-    await member.timeout(duration, reason);
-    
-    return true;
-  } catch (error) {
-    console.error('타임아웃 처리 중 오류:', error);
-    return false;
-  }
-}
-
-// 출석 체크 함수 수정
-async function handleAttendance(userId, username) {
-  try {
-    const today = new Date().toLocaleDateString('ko-KR');
-    
-    if (!attendanceData[userId]) {
-      attendanceData[userId] = {
-        lastAttendance: today,
-        streak: 1,
-        totalAttendance: 1
-      };
-    } else {
-      const lastDate = new Date(attendanceData[userId].lastAttendance);
-      const currentDate = new Date(today);
-      const diffDays = Math.floor((currentDate - lastDate) / (1000 * 60 * 60 * 24));
-
-      if (diffDays === 1) {
-        // 연속 출석
-        attendanceData[userId].streak++;
-      } else if (diffDays > 1) {
-        // 연속 출석 끊김
-        attendanceData[userId].streak = 1;
-      }
-
-      if (diffDays !== 0) {
-        // 오늘 처음 출석
-        attendanceData[userId].lastAttendance = today;
-        attendanceData[userId].totalAttendance++;
-      }
-    }
-
-    // Firebase에 저장
-    await saveAttendanceData();
-
-    return {
-      streak: attendanceData[userId].streak,
-      total: attendanceData[userId].totalAttendance
-    };
-  } catch (error) {
-    console.error('출석 처리 중 오류:', error);
-    return null;
-  }
-}
-
-// 봇 종료/재시작 시 처리
-process.on('SIGINT', async () => {
-  try {
-    // userStats 객체가 없으면 초기화
-    if (!userStats) {
-      userStats = {
-        voiceTime: {},
-        messageCount: {}
-      };
-    }
-
-    // voiceTime 객체가 없으면 초기화
-    if (!userStats.voiceTime) {
-      userStats.voiceTime = {};
-    }
-
-    // 모든 진행 중인 통화 시간 저장
-    for (const [userId, startTime] of voiceStartTimes) {
+    // 14분마다 자동 핑
+    setInterval(() => {
       try {
-        const duration = Date.now() - startTime;
-        if (!userStats.voiceTime[userId]) {
-          userStats.voiceTime[userId] = 0;
-        }
-        userStats.voiceTime[userId] += duration;
+        console.log('자동 핑 시도...');
+        const pingUrl = `${process.env.RENDER_EXTERNAL_URL}/ping`;
+        console.log('핑 URL:', pingUrl);
+        
+        axios.get(pingUrl)
+          .then(() => console.log('자동 핑 성공'))
+          .catch(error => {
+            console.error('자동 핑 실패:', error.message);
+            console.error('상세 에러:', error.response?.data || error);
+          });
       } catch (error) {
-        console.error(`사용자 ${userId}의 통화 시간 저장 중 오류:`, error);
+        console.error('자동 핑 실행 오류:', error);
       }
-    }
-    
-    // Firebase와 로컬에 저장
-    await saveStats();
-    console.log('통화 시간 저장 완료');
-  } catch (error) {
-    console.error('봇 종료 처리 중 오류:', error);
-  } finally {
-    process.exit();
-  }
+    }, 14 * 60 * 1000);
+  }).on('error', (err) => {
+    console.error('Express 서버 에러:', err);
+  });
+}
+
+// 에러 핸들링 추가
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
 });
 
 
