@@ -4353,16 +4353,46 @@ function startServer() {
 // 서버 시작 후 봇 로그인
 async function init() {
   try {
+    console.log('초기화 시작...');
+    
     // 서버 먼저 시작
+    console.log('Express 서버 시작 시도...');
     await startServer();
     console.log('서버 시작 완료');
 
+    // 봇 로그인 전 상태 확인
+    console.log('봇 상태 확인:');
+    console.log('- client 객체 존재:', !!client);
+    console.log('- client.user:', client.user);
+    console.log('- client.ws.status:', client.ws.status);
+
     // 봇 로그인
     console.log('Discord 봇 로그인 시도...');
-    await client.login(process.env.DISCORD_TOKEN);
-    console.log('Discord 봇 로그인 성공!');
+    try {
+      const loginPromise = client.login(process.env.DISCORD_TOKEN);
+      
+      // 30초 타임아웃 설정
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('로그인 시도 시간 초과 (30초)')), 30000);
+      });
+
+      // 로그인 시도와 타임아웃 경쟁
+      await Promise.race([loginPromise, timeoutPromise]);
+      
+      console.log('Discord 봇 로그인 성공!');
+      console.log('로그인 후 봇 상태:');
+      console.log('- client.user.tag:', client.user.tag);
+      console.log('- client.ws.status:', client.ws.status);
+      console.log('- client.guilds.cache.size:', client.guilds.cache.size);
+
+    } catch (loginError) {
+      console.error('Discord 봇 로그인 상세 에러:', loginError);
+      console.error('에러 스택:', loginError.stack);
+      throw loginError;
+    }
 
     // 자동 핑 설정
+    console.log('자동 핑 설정 시작...');
     setInterval(() => {
       try {
         console.log('자동 핑 시도...');
@@ -4373,29 +4403,45 @@ async function init() {
           .then(() => console.log('자동 핑 성공'))
           .catch(error => {
             console.error('자동 핑 실패:', error.message);
-            console.error('상세 에러:', error.response?.data || error);
+            if (error.response) {
+              console.error('응답 상태:', error.response.status);
+              console.error('응답 데이터:', error.response.data);
+            }
+            console.error('전체 에러:', error);
           });
       } catch (error) {
         console.error('자동 핑 실행 오류:', error);
       }
     }, 14 * 60 * 1000);
 
+    console.log('초기화 완료!');
+
   } catch (error) {
-    console.error('초기화 중 오류 발생:', error);
+    console.error('초기화 중 치명적 오류 발생:', error);
+    console.error('에러 종류:', error.constructor.name);
+    console.error('에러 스택:', error.stack);
     process.exit(1);
   }
 }
 
-// 초기화 시작
-init();
-
-// 에러 핸들링
-process.on('unhandledRejection', (error) => {
-  console.error('Unhandled promise rejection:', error);
+// Discord 클라이언트 이벤트 리스너 추가
+client.on('debug', info => {
+  console.log('Discord 디버그:', info);
 });
 
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
+client.on('error', error => {
+  console.error('Discord 에러:', error);
+});
+
+client.on('warn', warning => {
+  console.warn('Discord 경고:', warning);
+});
+
+// 초기화 시작
+console.log('프로그램 시작');
+init().catch(error => {
+  console.error('최상위 에러 핸들러:', error);
+  process.exit(1);
 });
 
 
