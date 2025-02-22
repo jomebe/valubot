@@ -24,20 +24,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --no-package-lock
 
-# 소스 코드 복사 전 디렉토리 확인
-RUN echo "Current directory contents:" && \
-    ls -la && \
-    echo "Checking for 'node' conflicts:" && \
-    find . -name "node" -type f -o -type d
-
 # 소스 코드 복사
 COPY . .
-
-# 복사 후 디렉토리 확인
-RUN echo "After copy, directory contents:" && \
-    ls -la && \
-    echo "Checking again for 'node' conflicts:" && \
-    find . -name "node" -type f -o -type d
 
 # 환경 변수 설정
 ENV NODE_ENV=production
@@ -47,12 +35,6 @@ ENV PATH=/usr/local/bin:$PATH
 ENV PORT=10000
 EXPOSE 10000
 
-# 시작 스크립트 생성
-RUN echo '#!/bin/sh' > /usr/local/bin/start-app && \
-    echo 'echo "Starting app with Node.js from: $(which node)"' >> /usr/local/bin/start-app && \
-    echo 'exec /usr/local/bin/node /app/index.js' >> /usr/local/bin/start-app && \
-    chmod +x /usr/local/bin/start-app
-
-# ENTRYPOINT로 시작 스크립트 지정
-ENTRYPOINT ["/usr/local/bin/start-app"]
-CMD [] 
+# Railway를 위한 직접적인 Node.js 실행
+ENTRYPOINT ["/usr/local/bin/node"]
+CMD ["index.js"] 
