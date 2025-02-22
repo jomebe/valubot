@@ -53,5 +53,6 @@ RUN echo '#!/bin/sh' > /usr/local/bin/start-app && \
     echo 'exec /usr/local/bin/node /app/index.js' >> /usr/local/bin/start-app && \
     chmod +x /usr/local/bin/start-app
 
-# 시작 스크립트로 실행
-CMD ["/usr/local/bin/start-app"] 
+# ENTRYPOINT로 시작 스크립트 지정
+ENTRYPOINT ["/usr/local/bin/start-app"]
+CMD [] 
