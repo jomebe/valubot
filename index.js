@@ -3409,76 +3409,19 @@ function cleanupQueue(queue) {
 
 // 봇 시작 시 초기화 실행
 client.once('ready', async () => {
-  try {
-    console.log(`Discord 봇 로그인 성공: ${client.user.tag}`);
-    
-    // 봇 상태 설정
-    client.user.setPresence({
-      activities: [{ 
-        name: 'ㅂ도움 | VALUBOT v1.2.0',
-        type: 0  // PLAYING
-      }],
-      status: 'online'
-    });
-
-    // 데이터 로드
-    await Promise.all([
-      loadValorantSettings(),
-      loadStats(),
-      loadTimeoutHistory(),
-      loadAttendanceData()
-    ]);
-    console.log('모든 데이터 로드 완료');
-
-    // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
-    client.guilds.cache.forEach(guild => {
-      guild.channels.cache.forEach(channel => {
-        if (channel.type === 2) { // 음성 채널
-          channel.members.forEach(member => {
-            if (!member.user.bot) { // 봇 제외
-              voiceStartTimes.set(member.id, Date.now());
-              console.log(`기존 통화 참여자 기록: ${member.user.tag}`);
-            }
-          });
-        }
-      });
-    });
-
-    // 1분마다 통화 시간 저장
-    setInterval(async () => {
-      try {
-        let updated = false;
-        for (const [userId, startTime] of voiceStartTimes) {
-          const duration = 60000; // 1분
-          if (!userStats.voiceTime[userId]) {
-            userStats.voiceTime[userId] = 0;
-          }
-          userStats.voiceTime[userId] += duration;
-          updated = true;
-          voiceStartTimes.set(userId, Date.now());
-        }
-
-        if (updated) {
-          await saveStats();
-          console.log('통화 시간 자동 저장 완료');
-        }
-      } catch (error) {
-        console.error('통화 시간 자동 저장 중 오류:', error);
-      }
-    }, 60000);
-
-  } catch (error) {
-    console.error('봇 초기화 중 오류:', error);
-  }
+  console.log(`로그인 완료: ${client.user.tag}`);
+  
+  // 통계 데이터 로드
+  loadStats();
+  console.log('통계 데이터를 성공적으로 불러왔습니다.');
+  
+  // 발로란트 설정 로드
+  loadValorantSettings();
+  console.log('발로란트 설정을 성공적으로 불러왔습니다.');
+  console.log(`등록된 계정 수: ${Object.keys(valorantSettings).length}`);
+  
+  console.log('초기화 완료');
 });
-
-// Discord 봇 로그인 부분 수정
-client.login(process.env.DISCORD_TOKEN)
-  .then(() => console.log('Discord 봇 로그인 시도 중...'))
-  .catch(err => {
-    console.error('Discord 봇 로그인 실패:', err);
-    process.exit(1);  // 로그인 실패 시 프로세스 종료
-  });
 
 // 검색 함수에 딜레이 추가
 async function searchVideo(query) {
@@ -4320,128 +4263,268 @@ async function processTTSQueue(guildId) {
 
 // Express 서버 설정 부분 수정
 const expressApp = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
-console.log('환경변수 확인:');
-console.log('PORT:', process.env.PORT);
-console.log('DISCORD_TOKEN:', process.env.DISCORD_TOKEN ? '설정됨' : '미설정');
-console.log('RENDER_EXTERNAL_URL:', process.env.RENDER_EXTERNAL_URL);
+// 기본 라우트 추가
+expressApp.get('/', (req, res) => {
+  res.send('Bot is running!');
+});
 
-// Express 서버 먼저 시작
-function startServer() {
-  return new Promise((resolve, reject) => {
-    const server = expressApp.listen(PORT, '0.0.0.0', () => {
-      console.log(`Express 서버가 포트 ${PORT}에서 실행 중입니다`);
-      resolve(server);
-    }).on('error', (err) => {
-      console.error('Express 서버 에러:', err);
-      reject(err);
-    });
+// 핑 엔드포인트 추가
+expressApp.get('/ping', (req, res) => {
+  res.send('pong');
+});
 
-    // 기본 라우트 추가
-    expressApp.get('/', (req, res) => {
-      res.send('Bot is running!');
-    });
+// 서버 시작
+expressApp.listen(PORT, '0.0.0.0', (err) => {
+  if (err) {
+    console.error('서버 시작 실패:', err);
+    return;
+  }
+  console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
 
-    // 핑 엔드포인트 추가
-    expressApp.get('/ping', (req, res) => {
-      res.send('pong');
-    });
-  });
-}
-
-// 서버 시작 후 봇 로그인
-async function init() {
-  try {
-    console.log('초기화 시작...');
-    
-    // 서버 먼저 시작
-    console.log('Express 서버 시작 시도...');
-    await startServer();
-    console.log('서버 시작 완료');
-
-    // 봇 로그인 전 상태 확인
-    console.log('봇 상태 확인:');
-    console.log('- client 객체 존재:', !!client);
-    console.log('- client.user:', client.user);
-    console.log('- client.ws.status:', client.ws.status);
-
-    // 봇 로그인
-    console.log('Discord 봇 로그인 시도...');
+  // 14분마다 자동 핑
+  setInterval(() => {
     try {
-      const loginPromise = client.login(process.env.DISCORD_TOKEN);
-      
-      // 30초 타임아웃 설정
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('로그인 시도 시간 초과 (30초)')), 30000);
-      });
+      axios.get(`${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}/ping`)
+        .then(() => console.log('자동 핑 성공'))
+        .catch(error => console.error('자동 핑 실패:', error));
+    } catch (error) {
+      console.error('자동 핑 오류:', error);
+    }
+  }, 14 * 60 * 1000); // 14분
+}).on('error', (err) => {
+  console.error('서버 에러:', err);
+});
 
-      // 로그인 시도와 타임아웃 경쟁
-      await Promise.race([loginPromise, timeoutPromise]);
-      
-      console.log('Discord 봇 로그인 성공!');
-      console.log('로그인 후 봇 상태:');
-      console.log('- client.user.tag:', client.user.tag);
-      console.log('- client.ws.status:', client.ws.status);
-      console.log('- client.guilds.cache.size:', client.guilds.cache.size);
+// Discord 봇 로그인 부분에 에러 핸들링 추가
+client.login(process.env.DISCORD_TOKEN).catch(err => {
+  console.error('Discord 봇 로그인 실패:', err);
+});
 
-    } catch (loginError) {
-      console.error('Discord 봇 로그인 상세 에러:', loginError);
-      console.error('에러 스택:', loginError.stack);
-      throw loginError;
+// 타임아웃 관련 코드 수정
+async function handleTimeout(member, duration, reason) {
+  try {
+    const userId = member.id;
+    const username = member.user.tag;
+
+    // 타임아웃 기록 생성/업데이트
+    if (!timeoutHistory[userId]) {
+      timeoutHistory[userId] = {
+        username: username,
+        timeouts: []
+      };
     }
 
-    // 자동 핑 설정
-    console.log('자동 핑 설정 시작...');
-    setInterval(() => {
-      try {
-        console.log('자동 핑 시도...');
-        const pingUrl = `${process.env.RENDER_EXTERNAL_URL}/ping`;
-        console.log('핑 URL:', pingUrl);
-        
-        axios.get(pingUrl)
-          .then(() => console.log('자동 핑 성공'))
-          .catch(error => {
-            console.error('자동 핑 실패:', error.message);
-            if (error.response) {
-              console.error('응답 상태:', error.response.status);
-              console.error('응답 데이터:', error.response.data);
-            }
-            console.error('전체 에러:', error);
-          });
-      } catch (error) {
-        console.error('자동 핑 실행 오류:', error);
-      }
-    }, 14 * 60 * 1000);
+    const timeoutData = {
+      timestamp: Date.now(),
+      duration: duration,
+      endTime: Date.now() + duration,
+      reason: reason || "미기재"
+    };
 
-    console.log('초기화 완료!');
+    timeoutHistory[userId].timeouts.push(timeoutData);
 
+    // Firebase에 저장
+    await saveTimeoutHistory();
+
+    // 실제 타임아웃 적용
+    await member.timeout(duration, reason);
+    
+    return true;
   } catch (error) {
-    console.error('초기화 중 치명적 오류 발생:', error);
-    console.error('에러 종류:', error.constructor.name);
-    console.error('에러 스택:', error.stack);
-    process.exit(1);
+    console.error('타임아웃 처리 중 오류:', error);
+    return false;
   }
 }
 
-// Discord 클라이언트 이벤트 리스너 추가
-client.on('debug', info => {
-  console.log('Discord 디버그:', info);
+// 출석 체크 함수 수정
+async function handleAttendance(userId, username) {
+  try {
+    const today = new Date().toLocaleDateString('ko-KR');
+    
+    if (!attendanceData[userId]) {
+      attendanceData[userId] = {
+        lastAttendance: today,
+        streak: 1,
+        totalAttendance: 1
+      };
+    } else {
+      const lastDate = new Date(attendanceData[userId].lastAttendance);
+      const currentDate = new Date(today);
+      const diffDays = Math.floor((currentDate - lastDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        // 연속 출석
+        attendanceData[userId].streak++;
+      } else if (diffDays > 1) {
+        // 연속 출석 끊김
+        attendanceData[userId].streak = 1;
+      }
+
+      if (diffDays !== 0) {
+        // 오늘 처음 출석
+        attendanceData[userId].lastAttendance = today;
+        attendanceData[userId].totalAttendance++;
+      }
+    }
+
+    // Firebase에 저장
+    await saveAttendanceData();
+
+    return {
+      streak: attendanceData[userId].streak,
+      total: attendanceData[userId].totalAttendance
+    };
+  } catch (error) {
+    console.error('출석 처리 중 오류:', error);
+    return null;
+  }
+}
+
+// 봇 시작 시 데이터 로드
+client.once('ready', async () => {
+  console.log('봇이 준비되었습니다.');
+  try {
+    await Promise.all([
+      loadValorantSettings(),
+      loadStats(),
+      loadTimeoutHistory(),
+      loadAttendanceData()
+    ]);
+    console.log('모든 데이터 로드 완료');
+
+    // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
+    client.guilds.cache.forEach(guild => {
+      guild.channels.cache.forEach(channel => {
+        if (channel.type === 2) { // 음성 채널
+          channel.members.forEach(member => {
+            if (!member.user.bot) { // 봇 제외
+              voiceStartTimes.set(member.id, Date.now());
+              console.log(`기존 통화 참여자 기록: ${member.user.tag}`);
+            }
+          });
+        }
+      });
+    });
+
+    // 1분마다 통화 시간 저장
+    setInterval(async () => {
+      try {
+        let updated = false;
+        
+        // 현재 통화 중인 모든 사용자의 시간 업데이트
+        for (const [userId, startTime] of voiceStartTimes) {
+          const duration = 60000; // 1분
+          
+          if (!userStats.voiceTime[userId]) {
+            userStats.voiceTime[userId] = 0;
+          }
+          userStats.voiceTime[userId] += duration;
+          updated = true;
+          
+          // 시작 시간 업데이트
+          voiceStartTimes.set(userId, Date.now());
+        }
+
+        // 변경된 내용이 있을 때만 저장
+        if (updated) {
+          await saveStats();
+          console.log('통화 시간 자동 저장 완료');
+        }
+      } catch (error) {
+        console.error('통화 시간 자동 저장 중 오류:', error);
+      }
+    }, 60000); // 1분마다 실행
+
+  } catch (error) {
+    console.error('데이터 로드 중 오류:', error);
+  }
 });
 
-client.on('error', error => {
-  console.error('Discord 에러:', error);
+// 음성 채널 입장 이벤트 처리
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  const userId = newState.member.id;
+  
+  // 음성 채널 입장
+  if (!oldState.channelId && newState.channelId) {
+    voiceStartTimes.set(userId, Date.now());
+  }
+  // 음성 채널 퇴장
+  else if (oldState.channelId && !newState.channelId) {
+    const startTime = voiceStartTimes.get(userId);
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      
+      // 기존 통화 시간에 추가
+      if (!userStats.voiceTime[userId]) {
+        userStats.voiceTime[userId] = 0;
+      }
+      userStats.voiceTime[userId] += duration;
+      
+      // Firebase와 로컬에 저장
+      await saveStats();
+      
+      // Map에서 시작 시간 제거
+      voiceStartTimes.delete(userId);
+    }
+  }
+  // 채널 이동
+  else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+    const startTime = voiceStartTimes.get(userId);
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      
+      // 기존 통화 시간에 추가
+      if (!userStats.voiceTime[userId]) {
+        userStats.voiceTime[userId] = 0;
+      }
+      userStats.voiceTime[userId] += duration;
+      
+      // 새로운 시작 시간 설정
+      voiceStartTimes.set(userId, Date.now());
+      
+      // Firebase와 로컬에 저장
+      await saveStats();
+    }
+  }
 });
 
-client.on('warn', warning => {
-  console.warn('Discord 경고:', warning);
+// 봇 종료/재시작 시 처리
+process.on('SIGINT', async () => {
+  try {
+    // userStats 객체가 없으면 초기화
+    if (!userStats) {
+      userStats = {
+        voiceTime: {},
+        messageCount: {}
+      };
+    }
+
+    // voiceTime 객체가 없으면 초기화
+    if (!userStats.voiceTime) {
+      userStats.voiceTime = {};
+    }
+
+    // 모든 진행 중인 통화 시간 저장
+    for (const [userId, startTime] of voiceStartTimes) {
+      try {
+        const duration = Date.now() - startTime;
+        if (!userStats.voiceTime[userId]) {
+          userStats.voiceTime[userId] = 0;
+        }
+        userStats.voiceTime[userId] += duration;
+      } catch (error) {
+        console.error(`사용자 ${userId}의 통화 시간 저장 중 오류:`, error);
+      }
+    }
+    
+    // Firebase와 로컬에 저장
+    await saveStats();
+    console.log('통화 시간 저장 완료');
+  } catch (error) {
+    console.error('봇 종료 처리 중 오류:', error);
+  } finally {
+    process.exit();
+  }
 });
-
-// 초기화 시작
-console.log('프로그램 시작');
-init().catch(error => {
-  console.error('최상위 에러 핸들러:', error);
-  process.exit(1);
-});
-
-
