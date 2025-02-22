@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     gcc \
     libc-dev \
-    opus-dev \
+    libopus-dev \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
