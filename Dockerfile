@@ -23,5 +23,5 @@ ENV NODE_ENV=production
 
 ENV PATH /usr/local/bin:$PATH
 
-ENTRYPOINT ["node"]
-CMD ["index.js"] 
+# ENTRYPOINT 제거하고 CMD만 사용
+CMD ["node", "index.js"] 
