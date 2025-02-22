@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:18-alpine3.17
 
 WORKDIR /app
 
@@ -8,4 +8,9 @@ RUN npm install --no-package-lock
 
 COPY . .
 
-CMD ["node", "index.js"] 
+ENV NODE_ENV=production
+
+ENV PATH /usr/local/bin:$PATH
+
+ENTRYPOINT ["node"]
+CMD ["index.js"] 
