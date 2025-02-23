@@ -4279,6 +4279,9 @@ async function processTTSQueue(guildId) {
 const expressApp = express();
 const PORT = process.env.PORT || 3000;
 
+// Vercel 서버리스 함수를 위한 export
+export default expressApp;
+
 // 기본 라우트 추가
 expressApp.get('/', (req, res) => {
   res.send('Bot is running!');
@@ -4289,29 +4292,18 @@ expressApp.get('/ping', (req, res) => {
   res.send('pong');
 });
 
-// 서버 시작
-expressApp.listen(PORT, '0.0.0.0', (err) => {
-  if (err) {
-    console.error('서버 시작 실패:', err);
-    return;
-  }
-  console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
-
-  // 14분마다 자동 핑
-  setInterval(() => {
-    try {
-      axios.get(`${process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`}/ping`)
-        .then(() => console.log('자동 핑 성공'))
-        .catch(error => console.error('자동 핑 실패:', error));
-    } catch (error) {
-      console.error('자동 핑 오류:', error);
+// 로컬 개발 환경에서만 서버 시작
+if (process.env.NODE_ENV !== 'production') {
+  expressApp.listen(PORT, '0.0.0.0', (err) => {
+    if (err) {
+      console.error('서버 시작 실패:', err);
+      return;
     }
-  }, 14 * 60 * 1000); // 14분
-}).on('error', (err) => {
-  console.error('서버 에러:', err);
-});
+    console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+  });
+}
 
-// Discord 봇 로그인 부분에 에러 핸들링 추가
+// Discord 봇 로그인
 client.login(process.env.DISCORD_TOKEN).catch(err => {
   console.error('Discord 봇 로그인 실패:', err);
 });

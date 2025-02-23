@@ -1,34 +1,34 @@
 {
   "820221944728780840": {
     "discordTag": "jombee.c",
-    "puuid": "9286a72b-8721-5e0b-8ab2-05d63419f37e",
-    "valorantTag": "2262",
-    "valorantName": "dong",
     "updatedAt": "2025-02-15T03:13:00.154Z",
-    "region": "kr"
-  },
-  "597363370307354624": {
-    "valorantName": "빗살문희토기",
-    "valorantTag": "나문희",
-    "updatedAt": "2025-02-15T03:54:57.488Z",
+    "valorantName": "dong",
     "region": "kr",
-    "puuid": "b02f0387-e8ab-52cb-b628-aee5c5ca0b36",
-    "discordTag": "iht_"
+    "valorantTag": "2262",
+    "puuid": "9286a72b-8721-5e0b-8ab2-05d63419f37e"
   },
   "527822898174623759": {
     "discordTag": "rkdwlghks",
-    "region": "kr",
     "valorantName": "backspacebar",
-    "valorantTag": "123",
+    "region": "kr",
     "puuid": "da377408-a716-55a4-8fbc-f8244ace24ed",
+    "valorantTag": "123",
     "updatedAt": "2025-02-17T14:48:02.204Z"
+  },
+  "597363370307354624": {
+    "region": "kr",
+    "puuid": "b02f0387-e8ab-52cb-b628-aee5c5ca0b36",
+    "valorantName": "빗살문희토기",
+    "discordTag": "iht_",
+    "valorantTag": "나문희",
+    "updatedAt": "2025-02-15T03:54:57.488Z"
   },
   "685049730560294962": {
     "updatedAt": "2025-02-17T16:47:16.062Z",
-    "valorantTag": "rtg",
-    "puuid": "140348ab-5033-5d20-b745-0f15f1ed6f2b",
     "discordTag": "herbsalt",
+    "puuid": "140348ab-5033-5d20-b745-0f15f1ed6f2b",
     "valorantName": "준비갈완료",
-    "region": "kr"
+    "region": "kr",
+    "valorantTag": "rtg"
   }
 }
