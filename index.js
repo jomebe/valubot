@@ -4452,6 +4452,12 @@ client.once('ready', async () => {
       }
     }, 60000); // 1분마다 실행
 
+    // 15분마다 temp 폴더 정리
+    setInterval(cleanupTempFolder, 15 * 60 * 1000);
+    
+    // 시작할 때도 한 번 정리
+    cleanupTempFolder();
+
   } catch (error) {
     console.error('데이터 로드 중 오류:', error);
   }
@@ -4531,4 +4537,30 @@ process.on('SIGINT', async () => {
     process.exit();
   }
 });
+
+// temp 폴더 정리 함수 추가 (processTTSQueue 함수 근처에 추가)
+async function cleanupTempFolder() {
+  try {
+    const files = fs.readdirSync(TEMP_DIR);
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const file of files) {
+      const filePath = path.join(TEMP_DIR, file);
+      const stats = fs.statSync(filePath);
+      
+      // 30분(1800000ms) 이상 된 파일 삭제
+      if (now - stats.mtimeMs > 1800000) {
+        fs.unlinkSync(filePath);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`temp 폴더 정리 완료: ${cleanedCount}개 파일 삭제됨`);
+    }
+  } catch (error) {
+    console.error('temp 폴더 정리 중 오류:', error);
+  }
+}
 
