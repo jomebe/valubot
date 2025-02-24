@@ -4279,29 +4279,38 @@ async function processTTSQueue(guildId) {
 const expressApp = express();
 const PORT = process.env.PORT || 3000;
 
-// Vercel 서버리스 함수를 위한 export
-export default expressApp;
-
 // 기본 라우트 추가
 expressApp.get('/', (req, res) => {
-  res.send('Bot is running!');
-});
-
-// 핑 엔드포인트 추가
-expressApp.get('/ping', (req, res) => {
-  res.send('pong');
-});
-
-// 로컬 개발 환경에서만 서버 시작
-if (process.env.NODE_ENV !== 'production') {
-  expressApp.listen(PORT, '0.0.0.0', (err) => {
-    if (err) {
-      console.error('서버 시작 실패:', err);
-      return;
-    }
-    console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+  res.json({
+    status: 'online',
+    uptime: process.uptime(),
+    lastPing: new Date().toISOString()
   });
-}
+});
+
+// keep-alive 엔드포인트 추가
+expressApp.get('/keep-alive', (req, res) => {
+  res.json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
+// 서버 시작
+expressApp.listen(PORT, '0.0.0.0', (err) => {
+  if (err) {
+    console.error('서버 시작 실패:', err);
+    return;
+  }
+  console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
+});
+
+// 10분마다 자동으로 keep-alive 요청 보내기
+setInterval(async () => {
+  try {
+    const response = await axios.get(`${process.env.RENDER_EXTERNAL_URL}/keep-alive`);
+    console.log('Keep-alive ping 성공:', response.data);
+  } catch (error) {
+    console.error('Keep-alive ping 실패:', error);
+  }
+}, 10 * 60 * 1000); // 10분
 
 // Discord 봇 로그인
 client.login(process.env.DISCORD_TOKEN).catch(err => {
