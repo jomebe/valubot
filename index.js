@@ -896,8 +896,7 @@ client.on('messageCreate', async (message) => {
 
     // 멘션이 활성화된 경우 먼저 멘션 메시지 보내기
     if (isMentionEnabled) {
-      // await message.channel.send('<@&1120254442596479016>');
-      await message.channel.send('test');
+      await message.channel.send('<@&1120254442596479016>');
     }
 
     const embed = {
