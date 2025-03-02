@@ -880,10 +880,10 @@ client.on('messageCreate', async (message) => {
 
     // 마지막 인자가 멘션 옵션인지 확인
     const mentionOption = args[args.length - 1].toUpperCase();
-    const isMentionEnabled = mentionOption === 'O';
+    const isMentionEnabled = mentionOption === 'O' || 'o';
     
     // 제목에서 멘션 옵션 제외
-    const title = args.slice(2, mentionOption === 'O' || mentionOption === 'X' ? -1 : undefined).join(' ');
+    const title = args.slice(2, mentionOption === ('O' || 'o') || mentionOption === 'X' ? -1 : undefined).join(' ');
     
     if (!title) {
       return message.reply('사용법: ㅂ선착 [인원수] [제목] [유저멘션여부]\n예시: ㅂ선착 5 발로란트 O');
@@ -896,7 +896,8 @@ client.on('messageCreate', async (message) => {
 
     // 멘션이 활성화된 경우 먼저 멘션 메시지 보내기
     if (isMentionEnabled) {
-      await message.channel.send('<@&1120254442596479016>');
+      // await message.channel.send('<@&1120254442596479016>');
+      await message.channel.send('test');
     }
 
     const embed = {
@@ -3682,7 +3683,7 @@ setInterval(() => {
 
 // 상단에 상수 추가
 const VOICE_CYCLE_ROLE_ID = process.env.VOICE_CYCLE_ROLE_ID;
-const VOICE_CYCLE_THRESHOLD = 3;  // 3회 이상 시 알림
+const VOICE_CYCLE_THRESHOLD = 6;  // 6회 이상 시 알림
 const RESET_INTERVAL = 5 * 60 * 1000;  // 5분 (밀리초)
 
 // voiceStateUpdate 이벤트 핸들러 수정
