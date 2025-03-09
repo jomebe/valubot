@@ -3797,17 +3797,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   // 방생성하기 채널 입장 감지 및 임시 채널 관리
   if (newState.channelId === VOICE_CREATOR_CHANNEL_ID) {
     try {
-      // 유저가 이미 생성한 채널이 있는지 확인
-      const existingChannel = newState.guild.channels.cache.find(
-        channel => channel.name === `${newState.member.displayName}의 채널`
-      );
-
-      if (existingChannel) {
-        // 기존 채널로 이동
-        await newState.setChannel(existingChannel);
-        return;
-      }
-
       // 카테고리 찾기 또는 생성
       let category = newState.guild.channels.cache.find(
         c => c.type === ChannelType.GuildCategory && c.name === TEMP_VOICE_CATEGORY
@@ -3820,9 +3809,27 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         });
       }
 
+      // 현재 카테고리의 음성채널 수 확인
+      const voiceChannels = category.children.cache.filter(channel => 
+        channel.type === ChannelType.GuildVoice &&
+        channel.name.startsWith('음성 수다방')
+      );
+
+      // 다음 번호 찾기
+      let nextNumber = 1;
+      const usedNumbers = new Set(
+        [...voiceChannels.values()]
+          .map(channel => parseInt(channel.name.match(/\d+/)?.[0]))
+          .filter(num => !isNaN(num))
+      );
+
+      while (usedNumbers.has(nextNumber)) {
+        nextNumber++;
+      }
+
       // 새 음성채널 생성
       const newChannel = await newState.guild.channels.create({
-        name: `${newState.member.displayName}의 채널`,
+        name: `음성 수다방 ${nextNumber}`,
         type: ChannelType.GuildVoice,
         parent: category.id,
         permissionOverwrites: [
