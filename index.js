@@ -3797,16 +3797,12 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   // 방생성하기 채널 입장 감지 및 임시 채널 관리
   if (newState.channelId === VOICE_CREATOR_CHANNEL_ID) {
     try {
-      // 카테고리 찾기 또는 생성
-      let category = newState.guild.channels.cache.find(
-        c => c.type === ChannelType.GuildCategory && c.name === TEMP_VOICE_CATEGORY
-      );
-
+      // 지정된 카테고리 ID로 카테고리 찾기
+      const category = newState.guild.channels.cache.get('1030768967763111948');
+      
       if (!category) {
-        category = await newState.guild.channels.create({
-          name: TEMP_VOICE_CATEGORY,
-          type: ChannelType.GuildCategory
-        });
+        console.error('지정된 카테고리를 찾을 수 없습니다.');
+        return;
       }
 
       // 현재 카테고리의 음성채널 수 확인
@@ -3852,17 +3848,17 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
   }
 
-  // 임시 음성채널이 비었을 때 즉시 삭제
+  // 임시 음성채널이 비었을 때 즉시 삭제 (카테고리 ID 수정)
   if (oldState.channel && 
-      oldState.channel.parent && 
-      oldState.channel.parent.name === TEMP_VOICE_CATEGORY && 
-      oldState.channel.members.size === 0) {
+      oldState.channel.parentId === '1030768967763111948' && // 카테고리 ID로 체크
+      oldState.channel.members.size === 0 &&
+      oldState.channel.name.startsWith('음성 수다방')) { // 음성 수다방으로 시작하는 채널만 삭제
     try {
-      const channelName = oldState.channel.name; // 미리 채널 이름 저장
+      const channelName = oldState.channel.name;
       await oldState.channel.delete();
       console.log(`빈 임시 채널 삭제됨: ${channelName}`);
     } catch (error) {
-      if (error.code === 10003) { // 이미 삭제된 채널
+      if (error.code === 10003) {
         console.log('채널이 이미 삭제되었습니다.');
       } else {
         console.error('임시 채널 삭제 중 오류:', error);
