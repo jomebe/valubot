@@ -5,7 +5,7 @@ dotenv.config();
 console.log('OpenAI API Key:', process.env.OPENAI_API_KEY ? '설정됨' : '미설정');
 
 // require 구문을 import로 변경
-import { Client, GatewayIntentBits, Events, AttachmentBuilder } from 'discord.js';
+import { Client, GatewayIntentBits, Events, AttachmentBuilder, ChannelType, PermissionsBitField } from 'discord.js';
 import { createAudioPlayer, createAudioResource, joinVoiceChannel, AudioPlayerStatus, NoSubscriberBehavior, getVoiceConnection, StreamType } from '@discordjs/voice';
 import fs from 'fs';
 import axios from 'axios';
@@ -1228,8 +1228,10 @@ client.on('messageCreate', async (message) => {
                  '`랜덤맵/ㄹㄷㅁ` - 랜덤 맵 선택'
         },
         {
-          name: '🎙️ TTS 명령어',
-          value: '`tts/ㅌㅌㅅ O/X` - TTS 켜기/끄기\n' +
+          name: '🎙️ 음성채널 명령어',
+          value: '`보이스 이름 [이름]` - 임시 음성채널 이름 변경\n' +
+                 '`보이스 인원 [숫자]` - 임시 음성채널 인원 제한 (0 = 제한없음)\n' +
+                 '`tts/ㅌㅌㅅ O/X` - TTS 켜기/끄기\n' +
                  '`tts설정/ㅌㅌㅅㅅㅈ [ko/en/ja/ch/la]` - TTS 언어 변경'
         },
         {
@@ -1252,8 +1254,8 @@ client.on('messageCreate', async (message) => {
                  '`타이머/ㅌㅇㅁ` - 타이머 생성\n' +
                  '`출첵/ㅊㅊ` - 출석체크\n' +
                  '`출첵현황/ㅊㅊㅎㅎ` - 출석 현황 확인\n' +
-                 '`핑/ㅍ` - 봇 지연시간 확인' +
-                 '`메시지순위/ㅁㅅㅈㅅㅇ` - 메시지 순위 확인' +
+                 '`핑/ㅍ` - 봇 지연시간 확인\n' +
+                 '`메시지순위/ㅁㅅㅈㅅㅇ` - 메시지 순위 확인\n' +
                  '`통화순위/ㅌㅎㅅㅈㅅㅇ` - 통화 순위 확인'
         }
       ],
@@ -3106,6 +3108,58 @@ client.on('messageCreate', async (message) => {
       }
     }
   }
+
+  // ㅂ보이스 명령어 처리
+  else if (content.startsWith('ㅂ보이스')) {
+    const args = content.slice(4).trim().split(' ');
+    const subCommand = args[0];
+    
+    // 사용자가 음성채널에 있는지 확인
+    const memberVoiceChannel = message.member.voice.channel;
+    if (!memberVoiceChannel) {
+      return message.reply('음성 채널에 먼저 입장해주세요.');
+    }
+
+    // 사용자의 임시 음성채널인지 확인
+    if (!memberVoiceChannel.parent || memberVoiceChannel.parent.name !== TEMP_VOICE_CATEGORY) {
+      return message.reply('임시 음성채널에서만 사용할 수 있는 명령어입니다.');
+    }
+
+    // 채널 관리 권한 확인
+    if (!memberVoiceChannel.permissionsFor(message.member).has(PermissionsBitField.Flags.ManageChannels)) {
+      return message.reply('자신이 만든 채널에서만 사용할 수 있습니다.');
+    }
+
+    try {
+      if (subCommand === '이름') {
+        const newName = args.slice(1).join(' ');
+        if (!newName) {
+          return message.reply('변경할 이름을 입력해주세요.\n사용법: ㅂ보이스 이름 [새로운 이름]');
+        }
+        await memberVoiceChannel.setName(newName);
+        message.reply(`채널 이름이 \`${newName}\`으로 변경되었습니다.`);
+      }
+      else if (subCommand === '인원') {
+        const limit = parseInt(args[1]);
+        if (isNaN(limit)) {
+          return message.reply('올바른 숫자를 입력해주세요.\n사용법: ㅂ보이스 인원 [숫자] (0 = 제한없음)');
+        }
+        
+        // 0이면 제한 없음, 그 외에는 입력된 숫자로 제한
+        const userLimit = limit === 0 ? 0 : Math.max(1, Math.min(99, limit));
+        await memberVoiceChannel.setUserLimit(userLimit);
+        
+        const limitMessage = userLimit === 0 ? '제한이 없습니다' : `${userLimit}명으로 제한되었습니다`;
+        message.reply(`채널 인원이 ${limitMessage}.`);
+      }
+      else {
+        message.reply('사용 가능한 명령어:\nㅂ보이스 이름 [새로운 이름]\nㅂ보이스 인원 [숫자] (0 = 제한없음)');
+      }
+    } catch (error) {
+      console.error('음성채널 설정 변경 중 오류:', error);
+      message.reply('설정 변경 중 오류가 발생했습니다.');
+    }
+  }
 });
 
 // 타임아웃 감지
@@ -3685,20 +3739,19 @@ const VOICE_CYCLE_ROLE_ID = process.env.VOICE_CYCLE_ROLE_ID;
 const VOICE_CYCLE_THRESHOLD = 6;  // 6회 이상 시 알림
 const RESET_INTERVAL = 5 * 60 * 1000;  // 5분 (밀리초)
 
+// 음성채널 생성 관련 상수
+const VOICE_CREATOR_CHANNEL_ID = '1348216782132871220';  // 방생성하기 채널 ID
+const TEMP_VOICE_CATEGORY = '임시 음성채널';  // 임시 채널이 생성될 카테고리 이름
+
 // voiceStateUpdate 이벤트 핸들러 수정
-client.on('voiceStateUpdate', (oldState, newState) => {
-  const userId = newState.member.user.id;
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  const userId = newState.member.id;
   const guildId = newState.guild.id;
 
-  // 봇은 제외
-  if (newState.member.user.bot) return;
-
-  // 서버별 카운트 초기화
+  // 길드별 카운트 초기화
   if (!voiceCycleCounts[guildId]) {
     voiceCycleCounts[guildId] = {};
   }
-  
-  // 유저별 카운트 초기화
   if (!voiceCycleCounts[guildId][userId]) {
     voiceCycleCounts[guildId][userId] = 0;
   }
@@ -3708,22 +3761,27 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   const isLeaving = oldState.channelId && !newState.channelId;  // 퇴장
   const isSwitching = oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId;  // 채널 이동
 
-  // 세 가지 경우 중 하나라도 발생하면 카운트 증가
-  if (isJoining || isLeaving || isSwitching) {
+  // 방생성하기 채널 관련 이동인지 확인
+  const isCreatorChannelInvolved = 
+    oldState.channelId === VOICE_CREATOR_CHANNEL_ID || 
+    newState.channelId === VOICE_CREATOR_CHANNEL_ID;
+
+  // 방생성하기 채널과 관련없는 이동일 때만 카운트 증가
+  if ((isJoining || isLeaving || isSwitching) && !isCreatorChannelInvolved) {
     voiceCycleCounts[guildId][userId]++;
     
     const logChannel = newState.guild.channels.cache.get(LOG_CHANNEL_ID);
     if (!logChannel) return;
 
-    // 한국 시간으로 변환 (수정된 부분)
+    // 한국 시간으로 변환
     const currentTime = new Date().toLocaleTimeString('ko-KR', {
       timeZone: 'Asia/Seoul',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',  // 초 추가
+      second: '2-digit',
       hour12: false,
-      hourCycle: 'h23'  // h23으로 설정하여 00-23 범위 사용
-    }).replace(/24:/, '00:');  // 24시는 00시로 변경
+      hourCycle: 'h23'
+    }).replace(/24:/, '00:');
     
     const count = voiceCycleCounts[guildId][userId];
     
@@ -3734,21 +3792,79 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     } else if (isSwitching) {
       logChannel.send(`[${currentTime}] 🎙️ ${newState.member.user.tag}님이 ${oldState.channel.name} 채널에서 ${newState.channel.name} 채널로 이동했습니다. (${count}회)`);
     }
+  }
 
-    // 임계값 도달 시 관리자 멘션
-    if (count === VOICE_CYCLE_THRESHOLD) {
-      const roleToMention = newState.guild.roles.cache.get(VOICE_CYCLE_ROLE_ID);
-      if (roleToMention) {
-        logChannel.send({
-          content: `${roleToMention} ${newState.member.user.tag}님이 음성 채널을 ${VOICE_CYCLE_THRESHOLD}회 이상 반복 입/퇴장했습니다.`,
-          allowedMentions: { roles: [VOICE_CYCLE_ROLE_ID] }
+  // 방생성하기 채널 입장 감지 및 임시 채널 관리
+  if (newState.channelId === VOICE_CREATOR_CHANNEL_ID) {
+    try {
+      // 유저가 이미 생성한 채널이 있는지 확인
+      const existingChannel = newState.guild.channels.cache.find(
+        channel => channel.name === `${newState.member.displayName}의 채널`
+      );
+
+      if (existingChannel) {
+        // 기존 채널로 이동
+        await newState.setChannel(existingChannel);
+        return;
+      }
+
+      // 카테고리 찾기 또는 생성
+      let category = newState.guild.channels.cache.find(
+        c => c.type === ChannelType.GuildCategory && c.name === TEMP_VOICE_CATEGORY
+      );
+
+      if (!category) {
+        category = await newState.guild.channels.create({
+          name: TEMP_VOICE_CATEGORY,
+          type: ChannelType.GuildCategory
         });
       }
-    }
 
-    // 콘솔 로그 기록
-    console.log(`[음성 로그] ${newState.member.user.tag}: ${voiceCycleCounts[guildId][userId]}회`);
+      // 새 음성채널 생성
+      const newChannel = await newState.guild.channels.create({
+        name: `${newState.member.displayName}의 채널`,
+        type: ChannelType.GuildVoice,
+        parent: category.id,
+        permissionOverwrites: [
+          {
+            id: newState.member.id,
+            allow: [
+              PermissionsBitField.Flags.ManageChannels,
+              PermissionsBitField.Flags.MoveMembers,
+              PermissionsBitField.Flags.MuteMembers,
+              PermissionsBitField.Flags.DeafenMembers
+            ]
+          }
+        ]
+      });
+
+      // 유저를 새 채널로 이동
+      await newState.setChannel(newChannel);
+    } catch (error) {
+      console.error('임시 음성채널 생성/관리 중 오류:', error);
+    }
   }
+
+  // 임시 음성채널이 비었을 때 즉시 삭제
+  if (oldState.channel && 
+      oldState.channel.parent && 
+      oldState.channel.parent.name === TEMP_VOICE_CATEGORY && 
+      oldState.channel.members.size === 0) {
+    try {
+      const channelName = oldState.channel.name; // 미리 채널 이름 저장
+      await oldState.channel.delete();
+      console.log(`빈 임시 채널 삭제됨: ${channelName}`);
+    } catch (error) {
+      if (error.code === 10003) { // 이미 삭제된 채널
+        console.log('채널이 이미 삭제되었습니다.');
+      } else {
+        console.error('임시 채널 삭제 중 오류:', error);
+      }
+    }
+  }
+
+  // 기존의 통화 시간 기록 로직 유지
+  // ... (나머지 코드)
 });
 
 // 5분마다 카운트 초기화
