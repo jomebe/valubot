@@ -3111,7 +3111,24 @@ client.on('messageCreate', async (message) => {
 
   // ㅂ보이스 명령어 처리
   else if (content.startsWith('ㅂ보이스') || content.startsWith('ㅂㅂㅇㅅ')) {
-    const args = content.slice(content.startsWith('ㅂ보이스') ? 4 : 5).trim().split(' ');
+    // 초성 명령어 처리를 위한 특별 처리
+    let args;
+    if (content.startsWith('ㅂㅂㅇㅅㅇㄹ')) {
+      args = ['이름', ...content.slice(6).trim().split(' ')];
+    } else if (content.startsWith('ㅂㅂㅇㅅㅇㅇ')) {
+      args = ['인원', ...content.slice(6).trim().split(' ')];
+    } else if (content.startsWith('ㅂㅂㅇㅅ ㅇㄹ')) {
+      args = ['이름', ...content.slice(8).trim().split(' ')];
+    } else if (content.startsWith('ㅂㅂㅇㅅ ㅇㅇ')) {
+      args = ['인원', ...content.slice(8).trim().split(' ')];
+    } else if (content.startsWith('ㅂ보이스 이름')) {
+      args = ['이름', ...content.slice(7).trim().split(' ')];
+    } else if (content.startsWith('ㅂ보이스 인원')) {
+      args = ['인원', ...content.slice(7).trim().split(' ')];
+    } else {
+      args = content.slice(content.startsWith('ㅂ보이스') ? 4 : 5).trim().split(' ');
+    }
+    
     const subCommand = args[0];
     
     // 사용자가 음성채널에 있는지 확인
@@ -3134,7 +3151,7 @@ client.on('messageCreate', async (message) => {
       if (subCommand === '이름' || subCommand === 'ㅇㄹ') {
         const newName = args.slice(1).join(' ');
         if (!newName) {
-          return message.reply('변경할 이름을 입력해주세요.\n사용법: ㅂ보이스 이름 [새로운 이름]\n초성: ㅂㅂㅇㅅ ㅇㄹ [새로운 이름]');
+          return message.reply('변경할 이름을 입력해주세요.\n사용법: ㅂ보이스 이름 [새로운 이름]\n초성: ㅂㅂㅇㅅ ㅇㄹ [새로운 이름]\n또는: ㅂㅂㅇㅅㅇㄹ [새로운 이름]');
         }
         await memberVoiceChannel.setName(newName);
         message.reply(`채널 이름이 \`${newName}\`으로 변경되었습니다.`);
@@ -3142,7 +3159,7 @@ client.on('messageCreate', async (message) => {
       else if (subCommand === '인원' || subCommand === 'ㅇㅇ') {
         const limit = parseInt(args[1]);
         if (isNaN(limit)) {
-          return message.reply('올바른 숫자를 입력해주세요.\n사용법: ㅂ보이스 인원 [숫자] (0 = 제한없음)\n초성: ㅂㅂㅇㅅ ㅇㅇ [숫자]');
+          return message.reply('올바른 숫자를 입력해주세요.\n사용법: ㅂ보이스 인원 [숫자] (0 = 제한없음)\n초성: ㅂㅂㅇㅅ ㅇㅇ [숫자]\n또는: ㅂㅂㅇㅅㅇㅇ [숫자]');
         }
         
         // 0이면 제한 없음, 그 외에는 입력된 숫자로 제한
@@ -3153,7 +3170,7 @@ client.on('messageCreate', async (message) => {
         message.reply(`채널 인원이 ${limitMessage}.`);
       }
       else {
-        message.reply('사용 가능한 명령어:\nㅂ보이스 이름 [새로운 이름] (초성: ㅂㅂㅇㅅ ㅇㄹ)\nㅂ보이스 인원 [숫자] (초성: ㅂㅂㅇㅅ ㅇㅇ) (0 = 제한없음)');
+        message.reply('사용 가능한 명령어:\nㅂ보이스 이름 [새로운 이름] (초성: ㅂㅂㅇㅅ ㅇㄹ 또는 ㅂㅂㅇㅅㅇㄹ)\nㅂ보이스 인원 [숫자] (초성: ㅂㅂㅇㅅ ㅇㅇ 또는 ㅂㅂㅇㅅㅇㅇ) (0 = 제한없음)');
       }
     } catch (error) {
       console.error('음성채널 설정 변경 중 오류:', error);
