@@ -1229,8 +1229,8 @@ client.on('messageCreate', async (message) => {
         },
         {
           name: '🎙️ 음성채널 명령어',
-          value: '`보이스 이름 [이름]` - 임시 음성채널 이름 변경\n' +
-                 '`보이스 인원 [숫자]` - 임시 음성채널 인원 제한 (0 = 제한없음)\n' +
+          value: '`보이스이름 [이름]` - 임시 음성채널 이름 변경\n' +
+                 '`보이스인원 [숫자]` - 임시 음성채널 인원 제한 (0 = 제한없음)\n' +
                  '`tts/ㅌㅌㅅ O/X` - TTS 켜기/끄기\n' +
                  '`tts설정/ㅌㅌㅅㅅㅈ [ko/en/ja/ch/la]` - TTS 언어 변경'
         },
@@ -3743,6 +3743,9 @@ const RESET_INTERVAL = 5 * 60 * 1000;  // 5분 (밀리초)
 const VOICE_CREATOR_CHANNEL_ID = '1348216782132871220';  // 방생성하기 채널 ID
 const TEMP_VOICE_CATEGORY = '임시 음성채널';  // 임시 채널이 생성될 카테고리 이름
 
+// 자동 삭제할 채널 ID를 저장할 Set 추가
+const autoDeleteChannels = new Set();
+
 // voiceStateUpdate 이벤트 핸들러 수정
 client.on('voiceStateUpdate', async (oldState, newState) => {
   const userId = newState.member.id;
@@ -3797,7 +3800,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   // 방생성하기 채널 입장 감지 및 임시 채널 관리
   if (newState.channelId === VOICE_CREATOR_CHANNEL_ID) {
     try {
-      // 지정된 카테고리 ID로 카테고리 찾기
       const category = newState.guild.channels.cache.get('1030768967763111948');
       
       if (!category) {
@@ -3841,6 +3843,9 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         ]
       });
 
+      // 자동 삭제 채널 목록에 추가
+      autoDeleteChannels.add(newChannel.id);
+
       // 유저를 새 채널로 이동
       await newState.setChannel(newChannel);
     } catch (error) {
@@ -3848,17 +3853,25 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
   }
 
-  // 임시 음성채널이 비었을 때 즉시 삭제 (카테고리 ID 수정)
+  // 임시 음성채널이 비었을 때 즉시 삭제
   if (oldState.channel && 
-      oldState.channel.parentId === '1030768967763111948' && // 카테고리 ID로 체크
+      oldState.channel.id && // ID가 존재하는지 확인
+      oldState.channel.parentId === '1030768967763111948' && 
+      oldState.channel.members && // members가 존재하는지 확인
       oldState.channel.members.size === 0 &&
-      oldState.channel.name.startsWith('음성 수다방')) { // 음성 수다방으로 시작하는 채널만 삭제
+      autoDeleteChannels.has(oldState.channel.id)) {
     try {
       const channelName = oldState.channel.name;
+      const channelId = oldState.channel.id; // ID 미리 저장
+      
       await oldState.channel.delete();
+      // 삭제된 채널 ID 제거
+      autoDeleteChannels.delete(channelId);
       console.log(`빈 임시 채널 삭제됨: ${channelName}`);
     } catch (error) {
       if (error.code === 10003) {
+        // 이미 삭제된 채널 ID 제거
+        autoDeleteChannels.delete(oldState.channel.id);
         console.log('채널이 이미 삭제되었습니다.');
       } else {
         console.error('임시 채널 삭제 중 오류:', error);
