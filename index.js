@@ -584,7 +584,7 @@ client.on('messageCreate', async (message) => {
   if (content === 'ㅂ도움' || content === 'ㅂㄷㅇ') {
     const embed = {
       color: 0xFF4654,
-      title: '🤖 발로봇 명령어 도움말',
+      title: '🤖 발루봇 명령어 도움말',
       description: '접두사: ㅂ\n모든 명령어는 초성으로도 사용 가능합니다.',
       fields: [
         {
