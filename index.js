@@ -581,7 +581,7 @@ client.on('messageCreate', async (message) => {
   if (!content.startsWith('ㅂ')) return;
 
   // 도움말 명령어 처리
-  if (content === 'ㅂ도움' || content === 'ㅂㄷㅇ') {
+  if (content === 'ㅂ도움2' || content === 'ㅂㄷㅇ2') {
     const embed = {
       color: 0xFF4654,
       title: '🤖 발루봇 명령어 도움말',
