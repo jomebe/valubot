@@ -549,10 +549,19 @@ client.once('ready', async () => {
   loadValorantSettings();  // 기존 발로란트 설정 로드
 });
 
-// 초성 매핑 (기본 명령어)
+// 기본 명령어 초성 매핑
 const commandMappings = {
-  'ㄷㅇ': 'ㅂ도움',
-  'ㄹㄷㅁ': 'ㅂ랜덤맵'
+  'ㄷㅇ': '도움',
+  'ㅊㅅ': '청소',
+  'ㅌㅍ': '투표',
+  'ㅌㅇㅁ': '타이머',
+  'ㅊㅊ': '출첵',
+  'ㅊㅊㅎㅎ': '출첵현황',
+  'ㅍ': '핑',
+  'ㅈㄱ': '전과',
+  'ㅌㄱ': '통계',
+  'ㅁㅅㅈㅅㅇ': '메시지순위',
+  'ㅌㅎㅅㅇ': '통화순위'
 };
 
 // 발로란트 관련 명령어 매핑 제거
@@ -560,405 +569,53 @@ const commandMappings = {
 
 // messageCreate 이벤트 수정 (발로란트 명령어 제거)
 client.on('messageCreate', async (message) => {
-  if (!message.author.bot) {
-    const userId = message.author.id;
-    userStats.messageCount[userId] = (userStats.messageCount[userId] || 0) + 1;
-    saveStats();
-  }
-
   if (message.author.bot) return;
 
-  // 초성 명령어 변환
-  let content = message.content;
-  if (content.startsWith('ㅂ')) {
-    const command = content.slice(1).split(' ')[0];
-    const mappedCommand = commandMappings[command];
-    if (mappedCommand) {
-      content = mappedCommand + content.slice(command.length + 1);
-    }
+  // 메시지 통계 업데이트
+  const userId = message.author.id;
+  if (!userStats.messageCount) userStats.messageCount = {};
+  userStats.messageCount[userId] = (userStats.messageCount[userId] || 0) + 1;
+  await saveStats();
+
+  const content = message.content;
+  if (!content.startsWith('ㅂ')) return;
+
+  // 도움말 명령어 처리
+  if (content === 'ㅂ도움' || content === 'ㅂㄷㅇ') {
+    const embed = {
+      color: 0xFF4654,
+      title: '🤖 발로봇 명령어 도움말',
+      description: '접두사: ㅂ\n모든 명령어는 초성으로도 사용 가능합니다.',
+      fields: [
+        {
+          name: '🎙️ 음성채널 명령어',
+          value: '`보이스 이름 [이름]` - 음성채널 이름 변경\n' +
+                 '`보이스 인원 [숫자]` - 음성채널 인원 제한 (0 = 제한없음)\n' +
+                 '`tts/ㅌㅌㅅ O/X` - TTS 켜기/끄기\n' +
+                 '`tts설정/ㅌㅌㅅㅅㅈ [ko/en/ja/ch/la]` - TTS 언어 변경'
+        },
+        {
+          name: '📊 기타 명령어',
+          value: '`전과/ㅈㄱ` - 타임아웃 기록 확인\n' +
+                 '`통계/ㅌㄱ` - 서버 활동 통계 확인\n' +
+                 '`청소/ㅊㅅ` - 메시지 일괄 삭제\n' +
+                 '`투표/ㅌㅍ` - 투표 생성\n' +
+                 '`타이머/ㅌㅇㅁ` - 타이머 생성\n' +
+                 '`출첵/ㅊㅊ` - 출석체크\n' +
+                 '`출첵현황/ㅊㅊㅎㅎ` - 출석 현황 확인\n' +
+                 '`핑/ㅍ` - 봇 지연시간 확인\n' +
+                 '`메시지순위/ㅁㅅㅈㅅㅇ` - 메시지 순위 확인\n' +
+                 '`통화순위/ㅌㅎㅅㅇ` - 통화 순위 확인'
+        }
+      ],
+      footer: {
+        text: '모든 명령어는 ㅂ로 시작하며, 초성으로도 사용 가능합니다!'
+      }
+    };
+
+    await message.reply({ embeds: [embed] });
+    return;
   }
-
-  // // "ㅂ발로등록" 명령어 처리
-  // if (content.startsWith('ㅂ발로등록')) {
-  //   // 이미 등록된 계정이 있는지 확인
-  //   if (valorantSettings[message.author.id]) {
-  //     return message.reply('❌ 이미 발로란트 계정이 등록되어 있습니다. 계정 변경이 필요한 경우 관리자에게 문의해주세요.');
-  //   }
-
-  //   const args = content.slice(5).trim().split('#');
-  //   if (args.length !== 2) {
-  //     return message.reply('사용법: ㅂ발로등록 닉네임#태그\n예시: ㅂ발로등록 닉네임#KR1');
-  //   }
-
-  //   const name = args[0].trim();
-  //   const tag = args[1].trim();
-
-  //   try {
-  //     const loadingMsg = await message.reply('🔍 계정을 확인중입니다...');
-      
-  //     // 계정 정보 가져오기 (v1 API 사용)
-  //     const accountResponse = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY
-  //         }
-  //       }
-  //     );
-
-  //     if (accountResponse.data.status !== 200) {
-  //       throw new Error('Account not found');
-  //     }
-
-  //     const accountData = accountResponse.data.data;
-  //     const region = accountData.region.toLowerCase();
-
-  //     // MMR 정보 가져오기 (v2 API 사용)
-  //     const mmrResponse = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY
-  //         }
-  //       }
-  //     );
-
-  //     const mmrData = mmrResponse.data.data;
-  //     const currentTier = mmrData.current_data.currenttierpatched.split(' ')[0];
-
-  //     // 계정 정보 저장
-  //     const discordId = message.author.id;
-  //     valorantSettings[discordId] = {
-  //       discordTag: message.author.tag,
-  //       valorantName: name,
-  //       valorantTag: tag,
-  //       region: region,
-  //       puuid: accountData.puuid,
-  //       updatedAt: new Date().toISOString()
-  //     };
-      
-  //     // Firebase와 로컬에 동시 저장
-  //     await saveValorantSettings();
-
-  //     // 티어 역할 업데이트 시도
-  //     try {
-  //       await updateTierRole(message.member, currentTier, message);
-  //     } catch (roleError) {
-  //       console.error('역할 업데이트 실패:', roleError);
-  //     }
-
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: `✅ 발로란트 계정 등록 완료`,
-  //       thumbnail: {
-  //         url: accountData.card?.small || 'https://i.imgur.com/G53MXS3.png'
-  //       },
-  //       description: `${message.author}님의 발로란트 계정이 등록되었습니다.`,
-  //       fields: [
-  //         {
-  //           name: '디스코드 계정',
-  //           value: message.author.tag,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '발로란트 계정',
-  //           value: `${name}#${tag}`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '🎮 계정 정보',
-  //           value: `레벨: ${accountData.account_level}\n지역: ${accountData.region}`,
-  //           inline: true
-  //         }
-  //       ],
-  //       footer: {
-  //         text: '이제 ㅂ발로 명령어만 입력해도 자동으로 이 계정이 검색됩니다.'
-  //       },
-  //       timestamp: new Date()
-  //     };
-
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-
-  //   } catch (error) {
-  //     console.error('상세 에러 정보:', error);
-      
-  //     if (error.response?.status === 404 || error.message === 'Account not found') {
-  //       message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
-  //     } else if (error.response?.status === 429) {
-  //       message.reply('❌ 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
-  //     } else {
-  //       message.reply('❌ 계정 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.');
-  //     }
-  //   }
-  // }
-
-  // // "ㅂ발로" 명령어 처리 부분
-  // else if (content.startsWith('ㅂ발로')) {
-  //   let name, tag;
-  //   const args = content.slice(3).trim();
-
-  //   if (!args) {
-  //     // 저장된 계정 정보 확인
-  //     const savedAccount = valorantSettings[message.author.id];
-  //     if (!savedAccount) {
-  //       return message.reply('사용법: ㅂ발로 닉네임#태그\n또는 ㅂ발로등록 으로 계정을 먼저 등록해주세요.');
-  //     }
-  //     name = savedAccount.valorantName;
-  //     tag = savedAccount.valorantTag;
-  //   } else {
-  //     // 기존 방식대로 인자 파싱
-  //     const parts = args.split('#');
-  //     if (parts.length !== 2) {
-  //       return message.reply('사용법: ㅂ발로 닉네임#태그\n예시: ㅂ발로 닉네임#KR1');
-  //     }
-  //     name = parts[0].trim();
-  //     tag = parts[1].trim();
-  //   }
-
-  //   try {
-  //     const loadingMsg = await message.reply('🔍 전적을 검색중입니다...');
-      
-  //     // 계정 정보 가져오기 (v1 API 사용)
-  //     const accountResponse = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY
-  //         }
-  //       }
-  //     );
-
-  //     const accountData = accountResponse.data.data;
-  //     const region = accountData.region.toLowerCase();
-
-  //     // MMR 정보 가져오기 (v2 API 사용)
-  //     const mmrResponse = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY
-  //         }
-  //       }
-  //     );
-
-  //     const mmrData = mmrResponse.data.data;
-
-  //     // 티어별 색상 설정
-  //     const tierColors = {
-  //       'Unranked': 0x808080,
-  //       'Iron': 0x7C7C7C,
-  //       'Bronze': 0xA0522D,
-  //       'Silver': 0xC0C0C0,
-  //       'Gold': 0xFFD700,
-  //       'Platinum': 0x00FFFF,
-  //       'Diamond': 0xFF69B4,
-  //       'Ascendant': 0x00FF00,
-  //       'Immortal': 0xFF0000,
-  //       'Radiant': 0xFFFF00
-  //     };
-
-  //     // 현재 티어에 따른 색상 선택
-  //     const currentTier = mmrData.current_data?.currenttierpatched?.split(' ')[0] || 'Unranked';
-  //     console.log('현재 티어:', currentTier); // 디버깅용
-  //     const embedColor = tierColors[currentTier] || 0xFF4654;
-
-  //     const embed = {
-  //       color: embedColor,
-  //       title: `${name}#${tag}님의 발로란트 정보 [${mmrData.current_data?.currenttierpatched || '미배치'}]`,
-  //       thumbnail: {
-  //         url: accountData.card.small || accountData.card.large || accountData.card.wide || 'https://i.imgur.com/G53MXS3.png'
-  //       },
-  //       fields: [
-  //         {
-  //           name: '🎮 계정 정보',
-  //           value: `레벨: ${accountData.account_level}\n지역: ${accountData.region}`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '🏆 현재 티어',
-  //           value: `${mmrData.current_data?.currenttierpatched || '미배치'}\nRR: ${mmrData.current_data?.ranking_in_tier || 0}`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '📈 최고 티어',
-  //           value: mmrData.highest_rank?.patched_tier || '정보 없음',
-  //           inline: true
-  //         }
-  //       ],
-  //       footer: {
-  //         text: 'Henrik.Dev API를 통해 제공됩니다.'
-  //       },
-  //       timestamp: new Date()
-  //     };
-
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-
-  //   } catch (error) {
-  //     console.error('상세 에러 정보:', {
-  //       status: error.response?.status,
-  //       statusText: error.response?.statusText,
-  //       data: error.response?.data,
-  //       url: error.config?.url
-  //     });
-      
-  //     if (error.response?.status === 404) {
-  //       message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
-  //     } else if (error.response?.status === 429) {
-  //       message.reply('❌ 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
-  //     } else {
-  //       message.reply('❌ 전적 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.');
-  //     }
-  //   }
-  // }
-
-
-  // // "ㅂ선착" 명령어 처리 부분
-  // else if (content.startsWith('ㅂ선착')) {
-  //   // 먼저 "ㅂ선착현황"과 "ㅂ선착취소" 명령어 확인
-  //   if (content === 'ㅂ선착현황') {
-  //     const queue = getWaitingQueue(message.guild.id);
-  //     if (!queue) {
-  //       return message.reply('진행 중인 선착순이 없습니다.');
-  //     }
-
-  //     const embed = {
-  //       color: 0x0099ff,
-  //       title: '🎮 ' + queue.message.embeds[0].title,
-  //       description: `현재 인원: ${queue.participants.length}/${queue.limit}\n\n참가자:\n${queue.participants.map((p, index) => `${index + 1}. ${p.toString()}`).join('\n') || '아직 참가자가 없습니다.'}`,
-  //       footer: {
-  //         text: '✅ 반응을 눌러 참가하거나 ❌ 반응을 눌러 나갈 수 있습니다.'
-  //       }
-  //     };
-
-  //     return message.reply({ embeds: [embed] });
-  //   }
-
-  //   // 선착순 취소 명령어 처리
-  //   else if (content === 'ㅂ선착취소') {
-  //     const queue = getWaitingQueue(message.guild.id);
-      
-  //     if (!queue) {
-  //       return message.reply('❌ 현재 진행 중인 선착순이 없습니다.');
-  //     }
-
-  //     // 특정 역할 ID를 가진 사람만 취소 가능
-  //     const hasRequiredRole = message.member.roles.cache.has('1134446476601344081');
-  //     // 선착순 생성자 체크
-  //     const isCreator = queue.creatorId === message.author.id;
-  //     // 첫 번째 참가자 체크
-  //     const isFirstParticipant = queue.participants.length > 0 && queue.participants[0].id === message.author.id;
-
-  //     if (!hasRequiredRole && !isCreator && !isFirstParticipant) {
-  //       return message.reply('❌ 선착순 취소는 생성자, 첫 번째 참가자, 또는 특정 역할을 가진 사람만 가능합니다.');
-  //     }
-
-  //     removeWaitingQueue(message.guild.id);
-  //     return message.reply('✅ 선착순이 취소되었습니다.');
-  //   }
-
-  //   // 일반 선착순 모집 처리
-  //   const args = content.split(' ');
-  //   const limit = parseInt(args[1]);
-
-  //   if (!args[1] || isNaN(limit) || limit <= 0) {
-  //     return message.reply('사용법: ㅂ선착 [인원수] [제목] [유저멘션여부]\n예시: ㅂ선착 5 발로란트 O\n(유저 멘션 여부에 응답하지 않을 경우 유저 멘션이 되지 않습니다)');
-  //   }
-
-  //   // 마지막 인자가 멘션 옵션인지 확인
-  //   const mentionOption = args[args.length - 1].toUpperCase();
-  //   const isMentionEnabled = mentionOption === 'O' || 'o';
-    
-  //   // 제목에서 멘션 옵션 제외
-  //   const title = args.slice(2, mentionOption === ('O' || 'o') || mentionOption === 'X' ? -1 : undefined).join(' ');
-    
-  //   if (!title) {
-  //     return message.reply('사용법: ㅂ선착 [인원수] [제목] [유저멘션여부]\n예시: ㅂ선착 5 발로란트 O');
-  //   }
-
-  //   // 이미 진행 중인 선착순이 있는지 확인
-  //   if (getWaitingQueue(message.guild.id)) {
-  //     return message.reply('이미 진행 중인 선착순이 있습니다.');
-  //   }
-
-  //   // 멘션이 활성화된 경우 먼저 멘션 메시지 보내기
-  //   if (isMentionEnabled) {
-  //     await message.channel.send('<@&1120254442596479016>');
-  //   }
-
-  //   const embed = {
-  //     color: 0x0099ff,
-  //     title: '🎮 ' + title,
-  //     description: `현재 인원: 0/${limit}\n\n참가하려면 ✅ 반응을 눌러주세요!`,
-  //     footer: {
-  //       text: '퇴장하려면 ❌ 반응을 눌러주세요.'
-  //     }
-  //   };
-
-  //   const queueMessage = await message.channel.send({ embeds: [embed] });
-  //   await queueMessage.react('✅');
-  //   await queueMessage.react('❌');
-
-  //   // 선착순 생성 및 생성자 자동 참가
-  //   createWaitingQueue(message.guild.id, limit, queueMessage, isMentionEnabled);
-  //   const queue = getWaitingQueue(message.guild.id);
-  //   queue.participants.push(message.author);
-  //   updateQueueEmbed(queue);
-
-  //   // 반응 수집기 생성
-  //   const filter = (reaction, user) => {
-  //     return ['✅', '❌'].includes(reaction.emoji.name) && !user.bot;
-  //   };
-
-  //   const collector = queueMessage.createReactionCollector({ filter, time: 86400000 }); // 1시간 동안 유지
-
-  //   collector.on('collect', async (reaction, user) => {
-  //     const queue = getWaitingQueue(message.guild.id);
-  //     if (!queue) return;
-
-  //     if (reaction.emoji.name === '✅') {
-  //       try {
-  //         await reaction.users.remove(user);
-  //       } catch (error) {
-  //         console.error('반응 제거 실패:', error);
-  //       }
-
-  //       // 이미 참가한 사용자인지 확인
-  //       if (queue.participants.find(p => p.id === user.id)) {
-  //         return;
-  //       }
-
-  //       // 인원 제한 확인
-  //       if (queue.participants.length >= queue.limit) {
-  //         return;
-  //       }
-
-  //       // 참가자 추가
-  //       queue.participants.push(user);
-  //       updateQueueEmbed(queue);
-
-  //     } else if (reaction.emoji.name === '❌') {
-  //       try {
-  //         await reaction.users.remove(user);
-  //       } catch (error) {
-  //         console.error('반응 제거 실패:', error);
-  //       }
-
-  //       // 참가자 제거
-  //       const index = queue.participants.findIndex(p => p.id === user.id);
-  //       if (index !== -1) {
-  //         queue.participants.splice(index, 1);
-  //         updateQueueEmbed(queue);
-  //       }
-  //     }
-  //   });
-
-  //   collector.on('end', () => {
-  //     if (getWaitingQueue(message.guild.id)) {
-  //       message.channel.send('⏰ 선착순 모집이 종료되었습니다.');
-  //       removeWaitingQueue(message.guild.id);
-  //     }
-  //   });
-  // }
 
   // "ㅂ출석" 명령어 처리
   else if (content === 'ㅂ출첵' || content === 'ㅂㅊㅊ') {
@@ -1159,27 +816,6 @@ client.on('messageCreate', async (message) => {
     message.reply({ embeds: [embed] });
   }
 
-  // // "ㅂ랜덤맵" 명령어 처리
-  // else if (content === 'ㅂ랜덤맵' || content === 'ㅂㄹㄷㅁ') {
-  //   const randomMap = valorantMaps[Math.floor(Math.random() * valorantMaps.length)];
-    
-  //   const attachment = new AttachmentBuilder(randomMap.image);
-  //   const embed = {
-  //     color: 0xFF4654,
-  //     title: '🎮 발로란트 랜덤 맵',
-  //     description: `선택된 맵: **${randomMap.name}**`,
-  //     image: {
-  //       url: 'attachment://' + randomMap.image.split('/').pop()
-  //     },
-  //     footer: {
-  //       text: '다시 뽑으려면 ㅂ랜덤맵을 입력하세요.'
-  //     },
-  //     timestamp: new Date()
-  //   };
-
-  //   message.reply({ embeds: [embed], files: [attachment] });
-  // }
-
   // "ㅂ랜덤" 명령어 처리
   else if (content.startsWith('ㅂ랜덤')) {
     const args = content.slice(4).trim().split(',').map(item => item.trim());
@@ -1190,67 +826,6 @@ client.on('messageCreate', async (message) => {
 
     const randomItem = args[Math.floor(Math.random() * args.length)];
     message.reply(`🎲 랜덤 선택: **${randomItem}**`);
-  }
-
-  // "ㅂ도움" 명령어 처리 부분 수정
-  else if (content === 'ㅂ도움' || content === 'ㅂㄷㅇ') {
-    const embed = {
-      color: 0xFF4654,
-      title: '🤖 발로봇 명령어 도움말',
-      description: '접두사: ㅂ\n모든 명령어는 초성으로도 사용 가능합니다.\n예시: ㅂㅂㄹ (ㅂ발로), ㅂㄷㅇ (ㅂ도움)',
-      fields: [
-        // {
-        //   name: '🎮 발로란트 명령어',
-        //   value: '`발로등록/ㅂㄹㄷㄹ 닉네임#태그` - 발로란트 계정 등록\n' +
-        //          '`발로/ㅂㄹ 닉네임#태그` - 발로란트 전적 검색\n' +
-        //          '`요원/ㅇㅇ 닉네임#태그` - 에이전트별 통계\n' +
-        //          '`무기/ㅁㄱ 닉네임#태그` - 무기별 통계\n' +
-        //          '`비교/ㅂㄱ 닉네임1#태그1 vs 닉네임2#태그2` - 플레이어 통계 비교\n' +
-        //          '`티어/ㅌㅇ 닉네임#태그` - 티어 정보 확인\n' +
-        //          '`티어갱신/ㅌㅇㅊㅇㅅ` - 티어 정보 갱신\n' +
-        //          '`매치/ㅁㅊ 닉네임#태그` - 최근 매치 기록\n' +
-        //          '`리더보드/ㄹㄷㅂㄷ` - 서버 내 티어 순위\n' +
-        //          '`조준점/ㅈㅈㅈ [코드]` - 조준점 미리보기 생성\n' +
-        //          '`랜덤맵/ㄹㄷㅁ` - 랜덤 맵 선택'
-        // },
-        {
-          name: '🎙️ 음성채널 명령어',
-          value: '`보이스이름 [이름]` - 임시 음성채널 이름 변경\n' +
-                 '`보이스인원 [숫자]` - 임시 음성채널 인원 제한 (0 = 제한없음)\n' +
-                 '`tts/ㅌㅌㅅ O/X` - TTS 켜기/끄기\n' +
-                 '`tts설정/ㅌㅌㅅㅅㅈ [ko/en/ja/ch/la]` - TTS 언어 변경'
-        },
-        {
-          name: '🎲 게임/재미',
-           value:// '`선착/ㅅㅊ [인원수] [제목] [멘션여부]` - 선착순 모집\n' +
-          //        '`선착현황/ㅅㅊㅎㅎ` - 선착순 현황 확인\n' +
-          //        '`선착취소/ㅅㅊㅊㅅ` - 선착순 모집 취소\n' +
-                 '`주사위/ㅈㅅㅇ` - 주사위 굴리기\n' +
-                 '`주사위게임/ㅈㅅㅇㄱㅇ` - 주사위 게임\n' +
-                 '`가위바위보/ㄱㅇㅂㅇㅂ` - 가위바위보 게임\n' +
-                 '`랜덤/ㄹㄷ [항목1] [항목2]...` - 랜덤 선택\n' +
-                 '`팀나누기/ㅌㄴㄴㄱ` - 음성채널 인원 팀 나누기'
-        },
-        {
-          name: '📊 기타 명령어',
-          value: '`전과/ㅈㄱ` - 타임아웃 기록 확인\n' +
-                 '`통계/ㅌㄱ` - 서버 활동 통계 확인\n' +
-                 '`청소/ㅊㅅ` - 메시지 일괄 삭제\n' +
-                 '`투표/ㅌㅍ` - 투표 생성\n' +
-                 '`타이머/ㅌㅇㅁ` - 타이머 생성\n' +
-                 '`출첵/ㅊㅊ` - 출석체크\n' +
-                 '`출첵현황/ㅊㅊㅎㅎ` - 출석 현황 확인\n' +
-                 '`핑/ㅍ` - 봇 지연시간 확인\n' +
-                 '`메시지순위/ㅁㅅㅈㅅㅇ` - 메시지 순위 확인\n' +
-                 '`통화순위/ㅌㅎㅅㅈㅅㅇ` - 통화 순위 확인'
-        }
-      ],
-      footer: {
-        text: '모든 명령어는 ㅂ로 시작하며, 초성으로도 사용 가능합니다!'
-      }
-    };
-
-    message.reply({ embeds: [embed] });
   }
 
   // "ㅂ주사위게임" 명령어 처리
@@ -1827,182 +1402,6 @@ client.on('messageCreate', async (message) => {
     message.reply('✅ 모든 통계가 초기화되었습니다.');
   }
 
-  // // "ㅂ발로등록" 명령어 처리
-  // else if (content.startsWith('ㅂ발로등록')) {
-  //   // 이미 등록된 계정이 있는지 확인
-  //   if (valorantSettings[message.author.id]) {
-  //     return message.reply('❌ 이미 발로란트 계정이 등록되어 있습니다. 계정 변경이 필요한 경우 관리자에게 문의해주세요.');
-  //   }
-
-  //   const args = content.slice(5).trim().split('#');
-  //   if (args.length !== 2) {
-  //     return message.reply('사용법: ㅂ발로등록 닉네임#태그\n예시: ㅂ발로등록 닉네임#KR1');
-  //   }
-
-  //   const name = args[0].trim();
-  //   const tag = args[1].trim();
-
-  //   try {
-  //     const loadingMsg = await message.reply('🔍 계정을 확인중입니다...');
-      
-  //     // 계정 정보 가져오기 (v1 API 사용)
-  //     const accountResponse = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY
-  //         }
-  //       }
-  //     );
-
-  //     if (accountResponse.data.status !== 1) {
-  //       throw new Error('Account not found');
-  //     }
-
-  //     const accountData = accountResponse.data.data;
-  //     const region = accountData.region.toLowerCase();
-
-  //     // MMR 정보 가져오기 (v2 API 사용)
-  //     const mmrResponse = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY  // 여기에 실제 API 키를 넣어주세요
-  //         }
-  //       }
-  //     );
-
-  //     if (mmrResponse.data.status !== 1) {
-  //       throw new Error('MMR data not found');
-  //     }
-
-  //     const mmrData = mmrResponse.data.data;
-
-  //     // 계정 정보 저장
-  //     const discordId = message.author.id;
-  //     const newSettings = {
-  //       ...valorantSettings,  // 기존 데이터 유지
-  //       [discordId]: {       // 새 데이터 추가
-  //         discordTag: message.author.tag,
-  //         valorantName: name,
-  //         valorantTag: tag,
-  //         region: region,
-  //         puuid: accountData.puuid,
-  //         updatedAt: new Date().toISOString()
-  //       }
-  //     };
-      
-  //     valorantSettings = newSettings;  // 전체 객체 업데이트
-  //     saveValorantSettings();         // 저장
-
-  //     const embed = {
-  //       color: 0x0099ff,
-  //       title: `✅ 발로란트 계정 등록 완료`,
-  //       thumbnail: {
-  //         url: accountData.card?.small || accountData.card?.large || accountData.card?.wide || 'https://i.imgur.com/G53MXS3.png'
-  //       },
-  //       description: `${message.author}님의 발로란트 계정이 등록되었습니다.`,
-  //       fields: [
-  //         {
-  //           name: '디스코드 계정',
-  //           value: message.author.tag,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '발로란트 계정',
-  //           value: `${name}#${tag}`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '🎮 계정 정보',
-  //           value: `레벨: ${accountData.account_level}\n지역: ${accountData.region}`,
-  //           inline: true
-  //         }
-  //       ],
-  //       footer: {
-  //         text: '이제 ㅂ발로 명령어만 입력해도 자동으로 이 계정이 검색됩니다.'
-  //       },
-  //       timestamp: new Date()
-  //     };
-
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-
-  //   } catch (error) {
-  //     console.error('상세 에러 정보:', {
-  //       status: error.response?.status,
-  //       statusText: error.response?.statusText,
-  //       data: error.response?.data,
-  //       url: error.config?.url
-  //     });
-      
-  //     if (error.response?.status === 404 || error.message === 'Account not found') {
-  //       message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
-  //     } else if (error.response?.status === 429) {
-  //       message.reply('❌ 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
-  //     } else {
-  //       message.reply('❌ 계정 정보를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.');
-  //     }
-  //   }
-  // }
-
-  // // "ㅂ티어갱신" 명령어 수정
-  // else if (content === 'ㅂ티어갱신' || content === 'ㅂㅌㅇㄱㅅ') {
-  //   const discordId = message.author.id;
-  //   const userData = valorantSettings[discordId];
-
-  //   if (!userData) {
-  //     return message.reply('❌ 등록된 발로란트 계정이 없습니다. `ㅂ발로등록` 명령어로 먼저 계정을 등록해주세요.');
-  //   }
-
-  //   try {
-  //     const loadingMsg = await message.reply('🔄 티어 정보를 갱신중입니다...');
-      
-  //     // MMR 정보 가져오기
-  //     const mmrResponse = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v2/mmr/${userData.region}/${encodeURIComponent(userData.valorantName)}/${encodeURIComponent(userData.valorantTag)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY
-  //         }
-  //       }
-  //     );
-
-  //     const mmrData = mmrResponse.data.data;
-  //     const currentTier = mmrData.current_data.currenttierpatched.split(' ')[0];
-      
-  //     // 티어 역할 업데이트
-  //     await updateTierRole(message.member, currentTier, message);
-
-  //     const embed = {
-  //       color: 0x00ff00,
-  //       title: '✅ 티어 갱신 완료',
-  //       description: `${message.author}님의 티어가 갱신되었습니다.`,
-  //       fields: [
-  //         {
-  //           name: '발로란트 계정',
-  //           value: `${userData.valorantName}#${userData.valorantTag}`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '현재 티어',
-  //           value: mmrData.current_data.currenttierpatched,
-  //           inline: true
-  //         }
-  //       ],
-  //       footer: {
-  //         text: '티어는 24시간마다 자동으로 갱신됩니다.'
-  //       },
-  //       timestamp: new Date()
-  //     };
-
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-
-  //   } catch (error) {
-  //     console.error('티어 갱신 중 오류:', error);
-  //     message.reply('❌ 티어 정보를 갱신하는데 실패했습니다. 잠시 후 다시 시도해주세요.');
-  //   }
-  // }
-
   // "ㅂ전과" 명령어 처리 추가
   else if (content === 'ㅂ전과' || content === 'ㅂㅈㄱ') {
     const userId = message.author.id;
@@ -2121,474 +1520,474 @@ client.on('messageCreate', async (message) => {
     message.reply(`✅ 제거됨: **${removedSong.title}**`);
   }
 
-  // // "ㅂ전적" 명령어 처리
-  // else if (content.startsWith('ㅂ전적')) {
-  //   const args = content.slice(4).trim().split('#');
-  //   if (args.length !== 2) {
-  //     return message.reply('사용법: ㅂ전적 닉네임#태그\n예시: ㅂ전적 닉네임#KR1');
-  //   }
+  // "ㅂ전적" 명령어 처리
+  else if (content.startsWith('ㅂ전적')) {
+    const args = content.slice(4).trim().split('#');
+    if (args.length !== 2) {
+      return message.reply('사용법: ㅂ전적 닉네임#태그\n예시: ㅂ전적 닉네임#KR1');
+    }
 
-  //   const name = args[0].trim();
-  //   const tag = args[1].trim();
+    const name = args[0].trim();
+    const tag = args[1].trim();
 
-  //   try {
-  //     const loadingMsg = await message.reply('🔍 전적을 검색중입니다...');
-  //     const stats = await getPlayerStats(name, tag);
+    try {
+      const loadingMsg = await message.reply('🔍 전적을 검색중입니다...');
+      const stats = await getPlayerStats(name, tag);
       
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: `${name}#${tag}의 전적`,
-  //       thumbnail: {
-  //         url: stats.account.card.small
-  //       },
-  //       fields: [
-  //         {
-  //           name: '현재 랭크',
-  //           value: stats.mmr.current_data.currenttierpatched,
-  //           inline: true
-  //         },
-  //         {
-  //           name: 'MMR',
-  //           value: `${stats.mmr.current_data.ranking_in_tier}`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '최근 20경기',
-  //           value: `승률: ${calculateWinRate(stats.matches)}%`,
-  //           inline: true
-  //         }
-  //       ],
-  //       footer: {
-  //         text: '최근 업데이트'
-  //       },
-  //       timestamp: new Date()
-  //     };
+      const embed = {
+        color: 0xFF4654,
+        title: `${name}#${tag}의 전적`,
+        thumbnail: {
+          url: stats.account.card.small
+        },
+        fields: [
+          {
+            name: '현재 랭크',
+            value: stats.mmr.current_data.currenttierpatched,
+            inline: true
+          },
+          {
+            name: 'MMR',
+            value: `${stats.mmr.current_data.ranking_in_tier}`,
+            inline: true
+          },
+          {
+            name: '최근 20경기',
+            value: `승률: ${calculateWinRate(stats.matches)}%`,
+            inline: true
+          }
+        ],
+        footer: {
+          text: '최근 업데이트'
+        },
+        timestamp: new Date()
+      };
 
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-  //   } catch (error) {
-  //     message.reply('❌ 전적 검색 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
-  //   }
-  // }
+      await loadingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      message.reply('❌ 전적 검색 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
+    }
+  }
 
-  // // "ㅂ리더보드" 명령어 처리
-  // else if (content === 'ㅂ리더보드' || content === 'ㅂㄹㄷㅂㄷ') {
-  //   try {
-  //     const loadingMsg = await message.reply('🏆 리더보드를 생성중입니다...');
-  //     const leaderboard = await generateLeaderboard(message.guild.id);
+  // "ㅂ리더보드" 명령어 처리
+  else if (content === 'ㅂ리더보드' || content === 'ㅂㄹㄷㅂㄷ') {
+    try {
+      const loadingMsg = await message.reply('🏆 리더보드를 생성중입니다...');
+      const leaderboard = await generateLeaderboard(message.guild.id);
       
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: '발로란트 티어 리더보드',
-  //       description: leaderboard,
-  //       footer: {
-  //         text: '리더보드는 등록된 계정의 현재 티어를 기준으로 정렬됩니다.'
-  //       },
-  //       timestamp: new Date()
-  //     };
+      const embed = {
+        color: 0xFF4654,
+        title: '발로란트 티어 리더보드',
+        description: leaderboard,
+        footer: {
+          text: '리더보드는 등록된 계정의 현재 티어를 기준으로 정렬됩니다.'
+        },
+        timestamp: new Date()
+      };
 
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-  //   } catch (error) {
-  //     message.reply('❌ 리더보드 생성 중 오류가 발생했습니다.');
-  //   }
-  // }
+      await loadingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      message.reply('❌ 리더보드 생성 중 오류가 발생했습니다.');
+    }
+  }
 
-  // // "ㅂ매치" 명령어 처리 추가
-  // else if (content.startsWith('ㅂ매치') || content === 'ㅂㅁㅊ') {
-  //   const args = content.slice(4).trim().split('#');
-  //   if (args.length !== 2) {
-  //     return message.reply('사용법: ㅂ매치 닉네임#태그\n예시: ㅂ매치 닉네임#KR1');
-  //   }
+  // "ㅂ매치" 명령어 처리 추가
+  else if (content.startsWith('ㅂ매치') || content === 'ㅂㅁㅊ') {
+    const args = content.slice(4).trim().split('#');
+    if (args.length !== 2) {
+      return message.reply('사용법: ㅂ매치 닉네임#태그\n예시: ㅂ매치 닉네임#KR1');
+    }
 
-  //   const name = args[0].trim();
-  //   const tag = args[1].trim();
+    const name = args[0].trim();
+    const tag = args[1].trim();
 
-  //   try {
-  //     const loadingMsg = await message.reply('🔍 매치 기록을 검색중입니다...');
-  //     const matches = await getMatchHistory(name, tag);
+    try {
+      const loadingMsg = await message.reply('🔍 매치 기록을 검색중입니다...');
+      const matches = await getMatchHistory(name, tag);
       
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: `${name}#${tag}의 최근 매치 기록`,
-  //       fields: matches.slice(0, 5).map((match, index) => ({
-  //         name: `${index + 1}. ${match.map} - ${match.mode}`,
-  //         value: `결과: ${match.result} (${match.score})\n` +
-  //                `요원: ${match.agent}\n` +
-  //                `KDA: ${match.kda}\n` +
-  //                `ACS: ${Math.round(match.acs)}\n` +
-  //                `${new Date(match.timestamp).toLocaleString('ko-KR')}`
-  //       })),
-  //       footer: {
-  //         text: '최근 5경기 기록'
-  //       },
-  //       timestamp: new Date()
-  //     };
+      const embed = {
+        color: 0xFF4654,
+        title: `${name}#${tag}의 최근 매치 기록`,
+        fields: matches.slice(0, 5).map((match, index) => ({
+          name: `${index + 1}. ${match.map} - ${match.mode}`,
+          value: `결과: ${match.result} (${match.score})\n` +
+                 `요원: ${match.agent}\n` +
+                 `KDA: ${match.kda}\n` +
+                 `ACS: ${Math.round(match.acs)}\n` +
+                 `${new Date(match.timestamp).toLocaleString('ko-KR')}`
+        })),
+        footer: {
+          text: '최근 5경기 기록'
+        },
+        timestamp: new Date()
+      };
 
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-  //   } catch (error) {
-  //     message.reply('❌ 매치 기록 검색 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
-  //   }
-  // }
+      await loadingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      message.reply('❌ 매치 기록 검색 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
+    }
+  }
 
-  // // MMR 변화 추적 함수
-  // else if (content.startsWith('ㅂ티어') || content === 'ㅂㅌㅇ') {
-  //   const args = content.slice(4).trim().split('#');
-  //   if (args.length !== 2) {
-  //     return message.reply('사용법: ㅂ티어 닉네임#태그\n예시: ㅂ티어 닉네임#KR1');
-  //   }
+  // MMR 변화 추적 함수
+  else if (content.startsWith('ㅂ티어') || content === 'ㅂㅌㅇ') {
+    const args = content.slice(4).trim().split('#');
+    if (args.length !== 2) {
+      return message.reply('사용법: ㅂ티어 닉네임#태그\n예시: ㅂ티어 닉네임#KR1');
+    }
 
-  //   const name = args[0].trim();
-  //   const tag = args[1].trim();
+    const name = args[0].trim();
+    const tag = args[1].trim();
 
-  //   try {
-  //     const loadingMsg = await message.reply('🔍 티어 정보를 검색중입니다...');
-  //     const mmrHistory = await getMMRHistory(name, tag);
+    try {
+      const loadingMsg = await message.reply('🔍 티어 정보를 검색중입니다...');
+      const mmrHistory = await getMMRHistory(name, tag);
       
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: `${name}#${tag}의 티어 정보`,
-  //       fields: [
-  //         {
-  //           name: '현재 티어',
-  //           value: mmrHistory.currentTier,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '현재 RR',
-  //           value: `${mmrHistory.currentRR}`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '최근 변동',
-  //           value: `${mmrHistory.mmrChange >= 0 ? '+' : ''}${mmrHistory.mmrChange} RR`,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '시즌 최고 티어',
-  //           value: mmrHistory.peakRank,
-  //           inline: true
-  //         },
-  //         {
-  //           name: '현재 시즌',
-  //           value: `Episode ${mmrHistory.seasonNumber}`,
-  //           inline: true
-  //         }
-  //       ],
-  //       footer: {
-  //         text: '최근 업데이트'
-  //       },
-  //       timestamp: new Date()
-  //     };
+      const embed = {
+        color: 0xFF4654,
+        title: `${name}#${tag}의 티어 정보`,
+        fields: [
+          {
+            name: '현재 티어',
+            value: mmrHistory.currentTier,
+            inline: true
+          },
+          {
+            name: '현재 RR',
+            value: `${mmrHistory.currentRR}`,
+            inline: true
+          },
+          {
+            name: '최근 변동',
+            value: `${mmrHistory.mmrChange >= 0 ? '+' : ''}${mmrHistory.mmrChange} RR`,
+            inline: true
+          },
+          {
+            name: '시즌 최고 티어',
+            value: mmrHistory.peakRank,
+            inline: true
+          },
+          {
+            name: '현재 시즌',
+            value: `Episode ${mmrHistory.seasonNumber}`,
+            inline: true
+          }
+        ],
+        footer: {
+          text: '최근 업데이트'
+        },
+        timestamp: new Date()
+      };
 
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-  //   } catch (error) {
-  //     message.reply('❌ 티어 정보 검색 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
-  //   }
-  // }
+      await loadingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      message.reply('❌ 티어 정보 검색 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
+    }
+  }
 
-  // // 플레이어 비교 함수 수정
-  // else if (content.startsWith('ㅂ비교') || content === 'ㅂㅂㄱ') {
-  //   const args = content.slice(3).trim().split(/\s+/);
+  // 플레이어 비교 함수 수정
+  else if (content.startsWith('ㅂ비교') || content === 'ㅂㅂㄱ') {
+    const args = content.slice(3).trim().split(/\s+/);
     
-  //   if (args.length < 2) {
-  //     return message.reply('사용법:\n1. ㅂ비교 닉네임#태그 닉네임#태그\n2. ㅂ비교 디스코드닉네임 디스코드닉네임');
-  //   }
+    if (args.length < 2) {
+      return message.reply('사용법:\n1. ㅂ비교 닉네임#태그 닉네임#태그\n2. ㅂ비교 디스코드닉네임 디스코드닉네임');
+    }
 
-  //   try {
-  //     let player1, player2;
+    try {
+      let player1, player2;
 
-  //     // 첫 번째 플레이어 정보 가져오기
-  //     if (args[0].includes('#')) {
-  //       // 닉네임#태그 형식
-  //       const [name1, tag1] = args[0].split('#');
-  //       player1 = { name: name1, tag: tag1 };
-  //     } else {
-  //       // 디스코드 닉네임으로 검색
-  //       const discordName1 = args[0];
-  //       const member1 = message.guild.members.cache.find(m => 
-  //         m.displayName.toLowerCase() === discordName1.toLowerCase() || 
-  //         m.user.username.toLowerCase() === discordName1.toLowerCase()
-  //       );
+      // 첫 번째 플레이어 정보 가져오기
+      if (args[0].includes('#')) {
+        // 닉네임#태그 형식
+        const [name1, tag1] = args[0].split('#');
+        player1 = { name: name1, tag: tag1 };
+      } else {
+        // 디스코드 닉네임으로 검색
+        const discordName1 = args[0];
+        const member1 = message.guild.members.cache.find(m => 
+          m.displayName.toLowerCase() === discordName1.toLowerCase() || 
+          m.user.username.toLowerCase() === discordName1.toLowerCase()
+        );
         
-  //       if (!member1) {
-  //         return message.reply(`❌ '${discordName1}' 유저를 찾을 수 없습니다.`);
-  //       }
+        if (!member1) {
+          return message.reply(`❌ '${discordName1}' 유저를 찾을 수 없습니다.`);
+        }
         
-  //       const valorantAccount1 = valorantSettings[member1.id];
-  //       if (!valorantAccount1?.name || !valorantAccount1?.tag) {  // null check 추가
-  //         return message.reply(`❌ '${discordName1}' 유저의 발로란트 계정이 등록되어 있지 않습니다.`);
-  //       }
+        const valorantAccount1 = valorantSettings[member1.id];
+        if (!valorantAccount1?.name || !valorantAccount1?.tag) {  // null check 추가
+          return message.reply(`❌ '${discordName1}' 유저의 발로란트 계정이 등록되어 있지 않습니다.`);
+        }
         
-  //       player1 = { 
-  //         name: valorantAccount1.name.trim(), 
-  //         tag: valorantAccount1.tag.trim() 
-  //       };
-  //     }
+        player1 = { 
+          name: valorantAccount1.name.trim(), 
+          tag: valorantAccount1.tag.trim() 
+        };
+      }
 
-  //     // 두 번째 플레이어 정보 가져오기
-  //     if (args[1].includes('#')) {
-  //       // 닉네임#태그 형식
-  //       const [name2, tag2] = args[1].split('#');
-  //       player2 = { name: name2, tag: tag2 };
-  //     } else {
-  //       // 디스코드 닉네임으로 검색
-  //       const discordName2 = args[1];
-  //       const member2 = message.guild.members.cache.find(m => 
-  //         m.displayName.toLowerCase() === discordName2.toLowerCase() || 
-  //         m.user.username.toLowerCase() === discordName2.toLowerCase()
-  //       );
+      // 두 번째 플레이어 정보 가져오기
+      if (args[1].includes('#')) {
+        // 닉네임#태그 형식
+        const [name2, tag2] = args[1].split('#');
+        player2 = { name: name2, tag: tag2 };
+      } else {
+        // 디스코드 닉네임으로 검색
+        const discordName2 = args[1];
+        const member2 = message.guild.members.cache.find(m => 
+          m.displayName.toLowerCase() === discordName2.toLowerCase() || 
+          m.user.username.toLowerCase() === discordName2.toLowerCase()
+        );
         
-  //       if (!member2) {
-  //         return message.reply(`❌ '${discordName2}' 유저를 찾을 수 없습니다.`);
-  //       }
+        if (!member2) {
+          return message.reply(`❌ '${discordName2}' 유저를 찾을 수 없습니다.`);
+        }
         
-  //       const valorantAccount2 = valorantSettings[member2.id];
-  //       if (!valorantAccount2?.name || !valorantAccount2?.tag) {  // null check 추가
-  //         return message.reply(`❌ '${discordName2}' 유저의 발로란트 계정이 등록되어 있지 않습니다.`);
-  //       }
+        const valorantAccount2 = valorantSettings[member2.id];
+        if (!valorantAccount2?.name || !valorantAccount2?.tag) {  // null check 추가
+          return message.reply(`❌ '${discordName2}' 유저의 발로란트 계정이 등록되어 있지 않습니다.`);
+        }
         
-  //       player2 = { 
-  //         name: valorantAccount2.name.trim(), 
-  //         tag: valorantAccount2.tag.trim() 
-  //       };
-  //     }
+        player2 = { 
+          name: valorantAccount2.name.trim(), 
+          tag: valorantAccount2.tag.trim() 
+        };
+      }
 
-  //     // 디버그 로그 추가
-  //     console.log('Player 1:', player1);
-  //     console.log('Player 2:', player2);
+      // 디버그 로그 추가
+      console.log('Player 1:', player1);
+      console.log('Player 2:', player2);
 
-  //     const loadingMsg = await message.reply('🔍 플레이어 통계를 비교중입니다...');
-  //     const comparison = await compareStats(player1, player2);
-  //     await loadingMsg.edit({ content: null, embeds: [comparison.embed] });
-  //   } catch (error) {
-  //     console.error('플레이어 비교 실패:', error);
-  //     if (error.response?.status === 404) {
-  //       message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
-  //     } else {
-  //       message.reply('❌ 플레이어 통계 비교 중 오류가 발생했습니다.');
-  //     }
-  //   }
-  // }
+      const loadingMsg = await message.reply('🔍 플레이어 통계를 비교중입니다...');
+      const comparison = await compareStats(player1, player2);
+      await loadingMsg.edit({ content: null, embeds: [comparison.embed] });
+    } catch (error) {
+      console.error('플레이어 비교 실패:', error);
+      if (error.response?.status === 404) {
+        message.reply('❌ 플레이어를 찾을 수 없습니다. 닉네임과 태그를 확인해주세요.');
+      } else {
+        message.reply('❌ 플레이어 통계 비교 중 오류가 발생했습니다.');
+      }
+    }
+  }
 
-  // // "ㅂ조준점" 명령어 처리
-  // else if (content.startsWith('ㅂ조준점') || content === 'ㅂㅈㅈㅈ') {
-  //   const args = content.slice(5).trim().split(' ');
-  //   const code = args.join(' ');
+  // "ㅂ조준점" 명령어 처리
+  else if (content.startsWith('ㅂ조준점') || content === 'ㅂㅈㅈㅈ') {
+    const args = content.slice(5).trim().split(' ');
+    const code = args.join(' ');
 
-  //   if (!code) {
-  //     return message.reply('사용법: ㅂ조준점 [조준점 코드]\n예시: ㅂ조준점 0;P;c;5;h;0;m;1;0l;4;0o;2;0a;1;0f;0;1b;0');
-  //   }
+    if (!code) {
+      return message.reply('사용법: ㅂ조준점 [조준점 코드]\n예시: ㅂ조준점 0;P;c;5;h;0;m;1;0l;4;0o;2;0a;1;0f;0;1b;0');
+    }
 
-  //   try {
-  //     const loadingMsg = await message.reply('🎯 조준점 이미지를 생성중입니다...');
+    try {
+      const loadingMsg = await message.reply('🎯 조준점 이미지를 생성중입니다...');
       
-  //     // Henrik.Dev API 호출
-  //     const response = await axios.get(
-  //       `https://api.henrikdev.xyz/valorant/v1/crosshair/generate?id=${encodeURIComponent(code)}`,
-  //       {
-  //         headers: {
-  //           'Authorization': process.env.VALORANT_API_KEY
-  //         },
-  //         responseType: 'arraybuffer'  // 이미지 데이터를 바이너리로 받기
-  //       }
-  //     );
+      // Henrik.Dev API 호출
+      const response = await axios.get(
+        `https://api.henrikdev.xyz/valorant/v1/crosshair/generate?id=${encodeURIComponent(code)}`,
+        {
+          headers: {
+            'Authorization': process.env.VALORANT_API_KEY
+          },
+          responseType: 'arraybuffer'  // 이미지 데이터를 바이너리로 받기
+        }
+      );
 
-  //     // 이미지 데이터를 Discord 첨부 파일로 변환
-  //     const attachment = new AttachmentBuilder(response.data, { name: 'crosshair.png' });
+      // 이미지 데이터를 Discord 첨부 파일로 변환
+      const attachment = new AttachmentBuilder(response.data, { name: 'crosshair.png' });
 
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: '🎯 조준점 미리보기',
-  //       description: '게임 내 설정 → 조준점 → 프로필 가져오기에서 아래 코드를 입력하세요.',
-  //       fields: [
-  //         {
-  //           name: '조준점 코드',
-  //           value: `\`${code}\``,
-  //           inline: false
-  //         }
-  //       ],
-  //       image: {
-  //         url: 'attachment://crosshair.png'
-  //       }
-  //     };
+      const embed = {
+        color: 0xFF4654,
+        title: '🎯 조준점 미리보기',
+        description: '게임 내 설정 → 조준점 → 프로필 가져오기에서 아래 코드를 입력하세요.',
+        fields: [
+          {
+            name: '조준점 코드',
+            value: `\`${code}\``,
+            inline: false
+          }
+        ],
+        image: {
+          url: 'attachment://crosshair.png'
+        }
+      };
 
-  //     await loadingMsg.edit({ content: null, embeds: [embed], files: [attachment] });
-  //   } catch (error) {
-  //     console.error('조준점 생성 실패:', error);
-  //     message.reply('❌ 조준점 생성 중 오류가 발생했습니다. 올바른 조준점 코드인지 확인해주세요.');
-  //   }
-  // }
+      await loadingMsg.edit({ content: null, embeds: [embed], files: [attachment] });
+    } catch (error) {
+      console.error('조준점 생성 실패:', error);
+      message.reply('❌ 조준점 생성 중 오류가 발생했습니다. 올바른 조준점 코드인지 확인해주세요.');
+    }
+  }
 
-  // // "ㅂ요원" 명령어 처리 수정
-  // else if (content.startsWith('ㅂ요원') || content === 'ㅂㅇㅇ') {
-  //   const args = content.slice(4).trim().split('#');
-  //   if (args.length !== 2) {
-  //     return message.reply('사용법: ㅂ요원 닉네임#태그\n예시: ㅂ요원 닉네임#KR1');
-  //   }
+  // "ㅂ요원" 명령어 처리 수정
+  else if (content.startsWith('ㅂ요원') || content === 'ㅂㅇㅇ') {
+    const args = content.slice(4).trim().split('#');
+    if (args.length !== 2) {
+      return message.reply('사용법: ㅂ요원 닉네임#태그\n예시: ㅂ요원 닉네임#KR1');
+    }
 
-  //   const name = args[0].trim();
-  //   const tag = args[1].trim();
+    const name = args[0].trim();
+    const tag = args[1].trim();
 
-  //   try {
-  //     const loadingMsg = await message.reply('🎮 에이전트 통계를 분석중입니다...');
-  //     const stats = await getPlayerStats(name, tag);
+    try {
+      const loadingMsg = await message.reply('🎮 에이전트 통계를 분석중입니다...');
+      const stats = await getPlayerStats(name, tag);
       
-  //     // 에이전트별 통계 집계
-  //     const agentStats = {};
-  //     stats.matches.forEach(match => {
-  //       const player = match.players.all_players.find(p => 
-  //         p.name.toLowerCase() === name.toLowerCase() && 
-  //         p.tag.toLowerCase() === tag.toLowerCase()
-  //       );
+      // 에이전트별 통계 집계
+      const agentStats = {};
+      stats.matches.forEach(match => {
+        const player = match.players.all_players.find(p => 
+          p.name.toLowerCase() === name.toLowerCase() && 
+          p.tag.toLowerCase() === tag.toLowerCase()
+        );
         
-  //       if (!player) return; // 플레이어를 찾지 못한 경우 스킵
+        if (!player) return; // 플레이어를 찾지 못한 경우 스킵
         
-  //       const agent = player.character;
-  //       if (!agentStats[agent]) {
-  //         agentStats[agent] = {
-  //           matches: 0,
-  //           wins: 0,
-  //           kills: 0,
-  //           deaths: 0,
-  //           assists: 0,
-  //           score: 0
-  //         };
-  //       }
+        const agent = player.character;
+        if (!agentStats[agent]) {
+          agentStats[agent] = {
+            matches: 0,
+            wins: 0,
+            kills: 0,
+            deaths: 0,
+            assists: 0,
+            score: 0
+          };
+        }
         
-  //       agentStats[agent].matches++;
-  //       // 승패 확인 로직 수정
-  //       const playerTeam = player.team.toLowerCase();
-  //       const isWinner = match.teams[playerTeam]?.has_won || false;
-  //       if (isWinner) agentStats[agent].wins++;
+        agentStats[agent].matches++;
+        // 승패 확인 로직 수정
+        const playerTeam = player.team.toLowerCase();
+        const isWinner = match.teams[playerTeam]?.has_won || false;
+        if (isWinner) agentStats[agent].wins++;
         
-  //       agentStats[agent].kills += player.stats.kills || 0;
-  //       agentStats[agent].deaths += player.stats.deaths || 0;
-  //       agentStats[agent].assists += player.stats.assists || 0;
-  //       agentStats[agent].score += player.stats.score || 0;
-  //     });
+        agentStats[agent].kills += player.stats.kills || 0;
+        agentStats[agent].deaths += player.stats.deaths || 0;
+        agentStats[agent].assists += player.stats.assists || 0;
+        agentStats[agent].score += player.stats.score || 0;
+      });
 
-  //     // 통계 정렬 및 포맷팅
-  //     const sortedAgents = Object.entries(agentStats)
-  //       .map(([agent, stats]) => ({
-  //         agent,
-  //         matches: stats.matches,
-  //         winRate: ((stats.wins / stats.matches) * 100).toFixed(1),
-  //         kda: ((stats.kills + stats.assists) / Math.max(stats.deaths, 1)).toFixed(2),
-  //         averageScore: Math.round(stats.score / stats.matches)
-  //       }))
-  //       .sort((a, b) => b.matches - a.matches);
+      // 통계 정렬 및 포맷팅
+      const sortedAgents = Object.entries(agentStats)
+        .map(([agent, stats]) => ({
+          agent,
+          matches: stats.matches,
+          winRate: ((stats.wins / stats.matches) * 100).toFixed(1),
+          kda: ((stats.kills + stats.assists) / Math.max(stats.deaths, 1)).toFixed(2),
+          averageScore: Math.round(stats.score / stats.matches)
+        }))
+        .sort((a, b) => b.matches - a.matches);
 
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: `${name}#${tag}의 에이전트 통계`,
-  //       description: `최근 ${stats.matches.length}경기 기준`,
-  //       fields: sortedAgents.map(agent => ({
-  //         name: `${agent.agent} (${agent.matches}경기)`,
-  //         value: `승률: ${agent.winRate}%\nKDA: ${agent.kda}\n평균 점수: ${agent.averageScore}`,
-  //         inline: true
-  //       })),
-  //       footer: {
-  //         text: `총 ${stats.matches.length}경기의 통계입니다.`
-  //       },
-  //       timestamp: new Date()
-  //     };
+      const embed = {
+        color: 0xFF4654,
+        title: `${name}#${tag}의 에이전트 통계`,
+        description: `최근 ${stats.matches.length}경기 기준`,
+        fields: sortedAgents.map(agent => ({
+          name: `${agent.agent} (${agent.matches}경기)`,
+          value: `승률: ${agent.winRate}%\nKDA: ${agent.kda}\n평균 점수: ${agent.averageScore}`,
+          inline: true
+        })),
+        footer: {
+          text: `총 ${stats.matches.length}경기의 통계입니다.`
+        },
+        timestamp: new Date()
+      };
 
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-  //   } catch (error) {
-  //     console.error('에이전트 통계 분석 중 오류:', error);
-  //     message.reply('❌ 에이전트 통계 분석 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
-  //   }
-  // }
+      await loadingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      console.error('에이전트 통계 분석 중 오류:', error);
+      message.reply('❌ 에이전트 통계 분석 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
+    }
+  }
 
-  // // "ㅂ무기" 명령어 처리 수정
-  // else if (content.startsWith('ㅂ무기') || content === 'ㅂㅁㄱ') {
-  //   const args = content.slice(4).trim().split('#');
-  //   if (args.length !== 2) {
-  //     return message.reply('사용법: ㅂ무기 닉네임#태그\n예시: ㅂ무기 닉네임#KR1');
-  //   }
+  // "ㅂ무기" 명령어 처리 수정
+  else if (content.startsWith('ㅂ무기') || content === 'ㅂㅁㄱ') {
+    const args = content.slice(4).trim().split('#');
+    if (args.length !== 2) {
+      return message.reply('사용법: ㅂ무기 닉네임#태그\n예시: ㅂ무기 닉네임#KR1');
+    }
 
-  //   const name = args[0].trim();
-  //   const tag = args[1].trim();
+    const name = args[0].trim();
+    const tag = args[1].trim();
 
-  //   try {
-  //     const loadingMsg = await message.reply('🔫 무기 통계를 분석중입니다...');
-  //     const stats = await getPlayerStats(name, tag);
+    try {
+      const loadingMsg = await message.reply('🔫 무기 통계를 분석중입니다...');
+      const stats = await getPlayerStats(name, tag);
       
-  //     // 무기별 통계 집계
-  //     const weaponStats = {};
-  //     let matchCount = 0;
+      // 무기별 통계 집계
+      const weaponStats = {};
+      let matchCount = 0;
 
-  //     stats.matches.forEach(match => {
-  //       const player = match.players.all_players.find(p => 
-  //         p.name.toLowerCase() === name.toLowerCase() && 
-  //         p.tag.toLowerCase() === tag.toLowerCase()
-  //       );
+      stats.matches.forEach(match => {
+        const player = match.players.all_players.find(p => 
+          p.name.toLowerCase() === name.toLowerCase() && 
+          p.tag.toLowerCase() === tag.toLowerCase()
+        );
         
-  //       if (!player) return; // 플레이어를 찾지 못한 경우 스킵
+        if (!player) return; // 플레이어를 찾지 못한 경우 스킵
         
-  //       matchCount++;
+        matchCount++;
         
-  //       // 무기 통계 처리
-  //       if (player.assets?.weapons) {
-  //         player.assets.weapons.forEach(weapon => {
-  //           const weaponName = weapon.name;
-  //           if (!weaponStats[weaponName]) {
-  //             weaponStats[weaponName] = {
-  //               kills: 0,
-  //               headshots: 0,
-  //               bodyshots: 0,
-  //               legshots: 0
-  //             };
-  //           }
+        // 무기 통계 처리
+        if (player.assets?.weapons) {
+          player.assets.weapons.forEach(weapon => {
+            const weaponName = weapon.name;
+            if (!weaponStats[weaponName]) {
+              weaponStats[weaponName] = {
+                kills: 0,
+                headshots: 0,
+                bodyshots: 0,
+                legshots: 0
+              };
+            }
             
-  //           weaponStats[weaponName].kills += weapon.kills || 0;
-  //           weaponStats[weaponName].headshots += weapon.headshots || 0;
-  //           weaponStats[weaponName].bodyshots += weapon.bodyshots || 0;
-  //           weaponStats[weaponName].legshots += weapon.legshots || 0;
-  //         });
-  //       }
-  //     });
+            weaponStats[weaponName].kills += weapon.kills || 0;
+            weaponStats[weaponName].headshots += weapon.headshots || 0;
+            weaponStats[weaponName].bodyshots += weapon.bodyshots || 0;
+            weaponStats[weaponName].legshots += weapon.legshots || 0;
+          });
+        }
+      });
 
-  //     // 통계 정렬 및 포맷팅
-  //     const sortedWeapons = Object.entries(weaponStats)
-  //       .map(([weapon, stats]) => {
-  //         const totalShots = stats.headshots + stats.bodyshots + stats.legshots;
-  //         return {
-  //           weapon,
-  //           kills: stats.kills,
-  //           headshotPercentage: totalShots > 0 ? ((stats.headshots / totalShots) * 100).toFixed(1) : '0.0',
-  //           killsPerMatch: (stats.kills / matchCount).toFixed(1)
-  //         };
-  //       })
-  //       .filter(weapon => weapon.kills > 0)  // 킬 수가 0인 무기 제외
-  //       .sort((a, b) => b.kills - a.kills)
-  //       .slice(0, 9); // 상위 9개 무기만 표시
+      // 통계 정렬 및 포맷팅
+      const sortedWeapons = Object.entries(weaponStats)
+        .map(([weapon, stats]) => {
+          const totalShots = stats.headshots + stats.bodyshots + stats.legshots;
+          return {
+            weapon,
+            kills: stats.kills,
+            headshotPercentage: totalShots > 0 ? ((stats.headshots / totalShots) * 100).toFixed(1) : '0.0',
+            killsPerMatch: (stats.kills / matchCount).toFixed(1)
+          };
+        })
+        .filter(weapon => weapon.kills > 0)  // 킬 수가 0인 무기 제외
+        .sort((a, b) => b.kills - a.kills)
+        .slice(0, 9); // 상위 9개 무기만 표시
 
-  //     if (sortedWeapons.length === 0) {
-  //       return message.reply(`❌ 무기 통계 데이터가 없습니다. 최근 ${stats.matches.length}경기에서 사용한 무기 기록이 없습니다.`);
-  //     }
+      if (sortedWeapons.length === 0) {
+        return message.reply(`❌ 무기 통계 데이터가 없습니다. 최근 ${stats.matches.length}경기에서 사용한 무기 기록이 없습니다.`);
+      }
 
-  //     const embed = {
-  //       color: 0xFF4654,
-  //       title: `${name}#${tag}의 무기 통계`,
-  //       description: `최근 ${stats.matches.length}경기 기준`,
-  //       fields: sortedWeapons.map(weapon => ({
-  //         name: `${weapon.weapon} (${weapon.kills}킬)`,
-  //         value: `헤드샷 비율: ${weapon.headshotPercentage}%\n` +
-  //                `평균 킬: ${weapon.killsPerMatch}/매치`,
-  //         inline: true
-  //       })),
-  //       footer: {
-  //         text: `총 ${stats.matches.length}경기의 통계입니다.`
-  //       },
-  //       timestamp: new Date()
-  //     };
+      const embed = {
+        color: 0xFF4654,
+        title: `${name}#${tag}의 무기 통계`,
+        description: `최근 ${stats.matches.length}경기 기준`,
+        fields: sortedWeapons.map(weapon => ({
+          name: `${weapon.weapon} (${weapon.kills}킬)`,
+          value: `헤드샷 비율: ${weapon.headshotPercentage}%\n` +
+                 `평균 킬: ${weapon.killsPerMatch}/매치`,
+          inline: true
+        })),
+        footer: {
+          text: `총 ${stats.matches.length}경기의 통계입니다.`
+        },
+        timestamp: new Date()
+      };
 
-  //     await loadingMsg.edit({ content: null, embeds: [embed] });
-  //   } catch (error) {
-  //     console.error('무기 통계 분석 중 오류:', error);
-  //     message.reply('❌ 무기 통계 분석 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
-  //   }
-  // }
+      await loadingMsg.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      console.error('무기 통계 분석 중 오류:', error);
+      message.reply('❌ 무기 통계 분석 중 오류가 발생했습니다. 닉네임과 태그를 확인해주세요.');
+    }
+  }
 
   // "ㅂtts" 명령어 처리 수정
   else if (content.startsWith('ㅂtts')) {
