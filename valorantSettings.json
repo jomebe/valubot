@@ -1,42 +1,42 @@
 {
   "685049730560294962": {
     "valorantName": "준비갈완료",
-    "puuid": "140348ab-5033-5d20-b745-0f15f1ed6f2b",
     "valorantTag": "rtg",
+    "puuid": "140348ab-5033-5d20-b745-0f15f1ed6f2b",
     "discordTag": "herbsalt",
     "region": "kr",
     "updatedAt": "2025-02-17T16:47:16.062Z"
   },
-  "820221944728780840": {
-    "discordTag": "jombee.c",
-    "puuid": "9286a72b-8721-5e0b-8ab2-05d63419f37e",
-    "region": "kr",
-    "valorantName": "dong",
-    "updatedAt": "2025-02-15T03:13:00.154Z",
-    "valorantTag": "2262"
-  },
   "900269171487698975": {
-    "updatedAt": "2025-03-08T09:32:12.884Z",
-    "puuid": "7c99fa3a-416e-5a56-b536-908353b72788",
-    "region": "kr",
-    "valorantName": "Duxckシ",
     "valorantTag": "duck1",
-    "discordTag": "duxck8"
-  },
-  "597363370307354624": {
     "region": "kr",
-    "discordTag": "iht_",
-    "valorantTag": "나문희",
-    "updatedAt": "2025-02-15T03:54:57.488Z",
-    "puuid": "b02f0387-e8ab-52cb-b628-aee5c5ca0b36",
-    "valorantName": "빗살문희토기"
+    "puuid": "7c99fa3a-416e-5a56-b536-908353b72788",
+    "discordTag": "duxck8",
+    "updatedAt": "2025-03-08T09:32:12.884Z",
+    "valorantName": "Duxckシ"
   },
   "527822898174623759": {
-    "region": "kr",
-    "discordTag": "rkdwlghks",
+    "updatedAt": "2025-02-17T14:48:02.204Z",
     "puuid": "da377408-a716-55a4-8fbc-f8244ace24ed",
-    "valorantTag": "123",
+    "discordTag": "rkdwlghks",
     "valorantName": "backspacebar",
-    "updatedAt": "2025-02-17T14:48:02.204Z"
+    "region": "kr",
+    "valorantTag": "123"
+  },
+  "820221944728780840": {
+    "valorantTag": "2262",
+    "valorantName": "dong",
+    "updatedAt": "2025-02-15T03:13:00.154Z",
+    "discordTag": "jombee.c",
+    "puuid": "9286a72b-8721-5e0b-8ab2-05d63419f37e",
+    "region": "kr"
+  },
+  "597363370307354624": {
+    "discordTag": "iht_",
+    "puuid": "b02f0387-e8ab-52cb-b628-aee5c5ca0b36",
+    "region": "kr",
+    "updatedAt": "2025-02-15T03:54:57.488Z",
+    "valorantTag": "나문희",
+    "valorantName": "빗살문희토기"
   }
 }
