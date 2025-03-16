@@ -19,6 +19,7 @@ import express from 'express';
 // 기존 import 구문들 아래에 추가
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import https from 'https';
 
 // 환경변수 로드 후에 Firebase 설정 추가
 const firebaseConfig = {
@@ -577,11 +578,167 @@ client.on('messageCreate', async (message) => {
   userStats.messageCount[userId] = (userStats.messageCount[userId] || 0) + 1;
   await saveStats();
 
+  // TTS 기능 처리 - 메시지가 ㅂ으로 시작하지 않으면 TTS 기능 수행
+  if (!message.content.startsWith('ㅂ')) {
+    const userId = message.author.id;
+    const userSettings = ttsSettings.get(userId);
+    
+    if (userSettings && userSettings.enabled && message.member?.voice?.channel) {
+      try {
+        const text = message.content;
+        if (text.trim().length > 0) {
+          await playTTS(message.member.voice.channel, text, '', userSettings.language);
+        }
+      } catch (error) {
+        console.error('TTS 처리 중 오류:', error.message);
+        message.channel.send('TTS 기능에 문제가 발생했습니다. 일시적으로 비활성화합니다.').catch(console.error);
+        userSettings.enabled = false;
+        ttsSettings.set(userId, userSettings);
+      }
+    }
+    return; // ㅂ으로 시작하는 명령어가 아니면 여기서 종료
+  }
+
   const content = message.content;
-  if (!content.startsWith('ㅂ')) return;
+
+  // TTS 명령어 처리 - 분기 처리 수정
+  if (content.startsWith('ㅂtts') || content.startsWith('ㅂㅌㅌㅅ')) {
+    // 단순 TTS 켜기/끄기: ㅂtts O/X
+    if (content === 'ㅂtts O' || content === 'ㅂtts X' || 
+        content === 'ㅂㅌㅌㅅ O' || content === 'ㅂㅌㅌㅅ X') {
+      
+      const option = content.split(' ')[1].toUpperCase();
+      
+      // 음성 채널에 접속해 있는지 확인
+      if (!message.member.voice.channel) {
+        return message.reply('음성 채널에 먼저 입장해주세요!');
+      }
+
+      const userId = message.author.id;
+      // 사용자 설정이 없으면 기본값 생성
+      if (!ttsSettings.has(userId)) {
+        ttsSettings.set(userId, { enabled: false, language: 'ko' });
+      }
+
+      // 설정 업데이트
+      const userSettings = ttsSettings.get(userId);
+      userSettings.enabled = option === 'O';
+      ttsSettings.set(userId, userSettings);
+
+      // 언어 이름 매핑
+      const languageNames = {
+        'ko': '한국어',
+        'en': '영어',
+        'ja': '일본어',
+        'ch': '중국어',
+        'la': '도파'
+      };
+
+      // 상태 메시지 전송
+      message.reply(`TTS 기능을 ${option === 'O' ? '켰습니다.' : '껐습니다.'} ${option === 'O' ? `현재 언어: ${languageNames[userSettings.language]}\n언어 변경: ㅂtts설정 [ko/en/ja/ch/la]` : ''}`);
+      
+      // TTS 기능이 켜진 경우 테스트 음성 재생
+      if (option === 'O') {
+        try {
+          const voiceChannel = message.member.voice.channel;
+          await playTTS(voiceChannel, '텍스트 음성 변환 기능이 활성화되었습니다.', '', userSettings.language);
+        } catch (error) {
+          console.error('TTS 테스트 중 오류:', error);
+          message.reply('TTS 기능 활성화 중 오류가 발생했습니다.');
+        }
+      }
+    }
+    // TTS 언어 설정: ㅂtts설정 en, ㅂtts 설정 en
+    else if (content.includes('설정') || content.includes('ㅅㅈ')) {
+      console.log('TTS 언어 설정 명령어 감지:', content);
+      
+      // 지원 언어 리스트
+      const supportedLanguages = ['ko', 'en', 'ja', 'ch', 'la'];
+      
+      // 언어 코드 찾기
+      let language = null;
+      
+      // 언어 코드 추출 시도
+      for (const lang of supportedLanguages) {
+        if (content.endsWith(lang)) {
+          language = lang;
+          break;
+        }
+      }
+      
+      // 영어로된 언어명 처리 (영어, 한국어 등)
+      if (!language) {
+        const languageMap = {
+          '영어': 'en',
+          '한국어': 'ko',
+          '일본어': 'ja',
+          '중국어': 'ch',
+          '도파': 'la'
+        };
+        
+        for (const [key, value] of Object.entries(languageMap)) {
+          if (content.endsWith(key)) {
+            language = value;
+            break;
+          }
+        }
+      }
+      
+      // 언어를 찾지 못한 경우
+      if (!language) {
+        console.log('유효한 언어 코드를 찾을 수 없습니다:', content);
+        return message.reply('사용법: `ㅂtts설정 [언어]`\n지원 언어: ko(한국어), en(영어), ja(일본어), ch(중국어), la(도파)');
+      }
+      
+      console.log('감지된 언어:', language);
+      
+      const userId = message.author.id;
+      // 사용자 설정이 없으면 기본값 생성
+      if (!ttsSettings.has(userId)) {
+        ttsSettings.set(userId, { enabled: false, language: 'ko' });
+      }
+
+      // 설정 업데이트
+      const userSettings = ttsSettings.get(userId);
+      userSettings.language = language;
+      ttsSettings.set(userId, userSettings);
+
+      const languageNames = {
+        'ko': '한국어',
+        'en': '영어',
+        'ja': '일본어',
+        'ch': '중국어',
+        'la': '도파'
+      };
+
+      message.reply(`TTS 언어를 ${languageNames[language]}로 설정했습니다.`);
+      
+      // 설정된 언어로 테스트 메시지 재생
+      if (userSettings.enabled && message.member.voice.channel) {
+        try {
+          const testMessages = {
+            'ko': '한국어로 설정되었습니다.',
+            'en': 'Set to English.',
+            'ja': '日本語に設定されました。',
+            'ch': '设置为中文。',
+            'la': 'Linguam Latinam electa est.' // 라틴어 메시지로 변경
+          };
+          
+          await playTTS(message.member.voice.channel, testMessages[language], '', language);
+        } catch (error) {
+          console.error('TTS 테스트 중 오류:', error);
+        }
+      }
+    }
+    // 기본 도움말
+    else {
+      message.reply('사용법: `ㅂtts O/X` - TTS 기능을 켜거나 끕니다.\n언어 설정: `ㅂtts설정 [언어]`\n지원 언어: ko(한국어), en(영어), ja(일본어), ch(중국어), la(도파)');
+    }
+    return;
+  }
 
   // 도움말 명령어 처리
-  if (content === 'ㅂ도움2' || content === 'ㅂㄷㅇ2') {
+  if (content === 'ㅂ도움' || content === 'ㅂㄷㅇ') {
     const embed = {
       color: 0xFF4654,
       title: '🤖 발루봇 명령어 도움말',
@@ -3621,6 +3778,101 @@ async function cleanupTempFolder() {
     }
   } catch (error) {
     console.error('temp 폴더 정리 중 오류:', error);
+  }
+}
+
+// TTS 재생 함수 수정
+async function playTTS(voiceChannel, text, username, language = 'ko') {
+  // 너무 긴 텍스트는 잘라내기 (API 제한)
+  if (text.length > 100) {
+    text = text.substring(0, 100) + '...';
+  }
+
+  try {
+    // 음성 채널 연결
+    const connection = joinVoiceChannel({
+      channelId: voiceChannel.id,
+      guildId: voiceChannel.guild.id,
+      adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+    });
+
+    // 임시 파일 이름 생성
+    const timestamp = Date.now();
+    const fileName = `${TEMP_DIR}/tts_${timestamp}.mp3`;
+    
+    // 언어 코드 변환
+    const ttsLanguages = {
+      'ko': 'ko',
+      'en': 'en',
+      'ja': 'ja',
+      'ch': 'zh-CN',
+      'la': 'la' // 라틴어로 변경
+    };
+    const langCode = ttsLanguages[language] || 'ko';
+
+    // Google TTS API 사용 (URL 생성) - 사용자 이름 제외
+    const formattedText = encodeURIComponent(text);
+    const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${langCode}&q=${formattedText}`;
+    
+    // URL에서 MP3 다운로드
+    await new Promise((resolve, reject) => {
+      const file = fs.createWriteStream(fileName);
+      https.get(googleTtsUrl, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`Google TTS 요청 실패: ${response.statusCode}`));
+          return;
+        }
+        
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close(resolve);
+          console.log(`Google TTS 파일 다운로드 완료: ${fileName}`);
+        });
+      }).on('error', (err) => {
+        fs.unlink(fileName, () => {}); // 오류 발생 시 파일 삭제 시도
+        reject(err);
+      });
+    });
+
+    // 오디오 재생
+    const player = createAudioPlayer({
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Play
+      }
+    });
+
+    const resource = createAudioResource(fileName, {
+      inputType: StreamType.Arbitrary
+    });
+
+    player.play(resource);
+    connection.subscribe(player);
+
+    console.log('재생 시작:', fileName);
+    
+    // 재생 종료 후 파일 삭제
+    player.on(AudioPlayerStatus.Idle, () => {
+      try {
+        fs.unlinkSync(fileName);
+        console.log('재생 완료 및 파일 삭제:', fileName);
+      } catch (err) {
+        console.error('파일 삭제 중 오류:', err);
+      }
+    });
+
+    // 오류 처리
+    player.on('error', error => {
+      console.error('오디오 재생 중 오류:', error);
+      try {
+        fs.unlinkSync(fileName);
+      } catch (err) {
+        console.error('파일 삭제 중 오류:', err);
+      }
+    });
+
+  } catch (error) {
+    console.error('TTS 처리 중 오류:', error.message);
+    throw error;
   }
 }
 
