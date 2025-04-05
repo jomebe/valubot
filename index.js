@@ -2932,6 +2932,22 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       // 자동 삭제 채널 목록에 추가
       autoDeleteChannels.add(newChannel.id);
 
+      // 채널 위치 조정 - 낮은 번호가 위에 오도록 설정
+      if (nextNumber < [...usedNumbers].sort((a, b) => a - b)[0]) {
+        // 기존 채널 중 가장 낮은 번호를 찾음
+        const lowestExistingChannel = [...voiceChannels.values()]
+          .sort((a, b) => {
+            const aNum = parseInt(a.name.match(/\d+/)?.[0]) || 0;
+            const bNum = parseInt(b.name.match(/\d+/)?.[0]) || 0;
+            return aNum - bNum;
+          })[0];
+        
+        if (lowestExistingChannel) {
+          // 새로 생성한 채널을 기존 가장 낮은 번호 채널보다 위에 위치시킴
+          await newChannel.setPosition(lowestExistingChannel.position);
+        }
+      }
+
       // 유저를 새 채널로 이동
       await newState.setChannel(newChannel);
     } catch (error) {
