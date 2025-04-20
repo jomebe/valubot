@@ -2155,7 +2155,7 @@ client.on('messageCreate', async (message) => {
         title: '🤖 AI 응답',
         description: `**질문**\n${question}\n\n**답변**\n${answer}`,
         footer: {
-          text: `Powered by Gemini 2.0 • 응답 시간: ${responseTime}초`
+          text: `Powered by Gemma 3.0 • 응답 시간: ${responseTime}초`
         }
       };
 
