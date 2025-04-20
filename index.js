@@ -746,8 +746,8 @@ client.on('messageCreate', async (message) => {
       fields: [
         {
           name: '🎙️ 음성채널 명령어',
-          value: '`보이스 이름 [이름]` - 음성채널 이름 변경\n' +
-                 '`보이스 인원 [숫자]` - 음성채널 인원 제한 (0 = 제한없음)\n' +
+          value: '`음성 이름 [이름]` - 음성채널 이름 변경\n' +
+                 '`음성 인원 [숫자]` - 음성채널 인원 제한 (0 = 제한없음)\n' +
                  '`tts/ㅌㅌㅅ O/X` - TTS 켜기/끄기\n' +
                  '`tts설정/ㅌㅌㅅㅅㅈ [ko/en/ja/ch/la]` - TTS 언어 변경'
         },
@@ -2183,24 +2183,24 @@ client.on('messageCreate', async (message) => {
     }
   }
 
-  // ㅂ보이스 명령어 처리
-  else if (content.startsWith('ㅂ보이스') || content.startsWith('ㅂㅂㅇㅅ')) {
+  // ㅂ음성 명령어 처리
+  else if (content.startsWith('ㅂ음성') || content.startsWith('ㅂㅇㅅ')) {
     // 초성 명령어 처리를 위한 특별 처리
     let args;
-    if (content.startsWith('ㅂㅂㅇㅅㅇㄹ')) {
+    if (content.startsWith('ㅂㅇㅅㅇㄹ')) {
       args = ['이름', ...content.slice(6).trim().split(' ')];
-    } else if (content.startsWith('ㅂㅂㅇㅅㅇㅇ')) {
+    } else if (content.startsWith('ㅂㅇㅅㅇㅇ')) {
       args = ['인원', ...content.slice(6).trim().split(' ')];
-    } else if (content.startsWith('ㅂㅂㅇㅅ ㅇㄹ')) {
+    } else if (content.startsWith('ㅂㅇㅅ ㅇㄹ')) {
       args = ['이름', ...content.slice(8).trim().split(' ')];
-    } else if (content.startsWith('ㅂㅂㅇㅅ ㅇㅇ')) {
+    } else if (content.startsWith('ㅂㅇㅅ ㅇㅇ')) {
       args = ['인원', ...content.slice(8).trim().split(' ')];
-    } else if (content.startsWith('ㅂ보이스 이름')) {
+    } else if (content.startsWith('ㅂ음성 이름')) {
       args = ['이름', ...content.slice(7).trim().split(' ')];
-    } else if (content.startsWith('ㅂ보이스 인원')) {
+    } else if (content.startsWith('ㅂ음성 인원')) {
       args = ['인원', ...content.slice(7).trim().split(' ')];
     } else {
-      args = content.slice(content.startsWith('ㅂ보이스') ? 4 : 5).trim().split(' ');
+      args = content.slice(content.startsWith('ㅂ음성') ? 4 : 5).trim().split(' ');
     }
     
     const subCommand = args[0];
@@ -2225,7 +2225,7 @@ client.on('messageCreate', async (message) => {
       if (subCommand === '이름' || subCommand === 'ㅇㄹ') {
         const newName = args.slice(1).join(' ');
         if (!newName) {
-          return message.reply('변경할 이름을 입력해주세요.\n사용법: ㅂ보이스 이름 [새로운 이름]\n초성: ㅂㅂㅇㅅ ㅇㄹ [새로운 이름]\n또는: ㅂㅂㅇㅅㅇㄹ [새로운 이름]');
+          return message.reply('변경할 이름을 입력해주세요.\n사용법: ㅂ음성 이름 [새로운 이름]\n초성: ㅂㅇㅅ ㅇㄹ [새로운 이름]\n또는: ㅂㅇㅅㅇㄹ [새로운 이름]');
         }
         await memberVoiceChannel.setName(newName);
         message.reply(`채널 이름이 \`${newName}\`으로 변경되었습니다.`);
@@ -2233,7 +2233,7 @@ client.on('messageCreate', async (message) => {
       else if (subCommand === '인원' || subCommand === 'ㅇㅇ') {
         const limit = parseInt(args[1]);
         if (isNaN(limit)) {
-          return message.reply('올바른 숫자를 입력해주세요.\n사용법: ㅂ보이스 인원 [숫자] (0 = 제한없음)\n초성: ㅂㅂㅇㅅ ㅇㅇ [숫자]\n또는: ㅂㅂㅇㅅㅇㅇ [숫자]');
+          return message.reply('올바른 숫자를 입력해주세요.\n사용법: ㅂ음성 인원 [숫자] (0 = 제한없음)\n초성: ㅂㅇㅅ ㅇㅇ [숫자]\n또는: ㅂㅇㅅㅇㅇ [숫자]');
         }
         
         // 0이면 제한 없음, 그 외에는 입력된 숫자로 제한
@@ -2244,7 +2244,7 @@ client.on('messageCreate', async (message) => {
         message.reply(`채널 인원이 ${limitMessage}.`);
       }
       else {
-        message.reply('사용 가능한 명령어:\nㅂ보이스 이름 [새로운 이름] (초성: ㅂㅂㅇㅅ ㅇㄹ 또는 ㅂㅂㅇㅅㅇㄹ)\nㅂ보이스 인원 [숫자] (초성: ㅂㅂㅇㅅ ㅇㅇ 또는 ㅂㅂㅇㅅㅇㅇ) (0 = 제한없음)');
+        message.reply('사용 가능한 명령어:\nㅂ음성 이름 [새로운 이름] (초성: ㅂㅇㅅ ㅇㄹ 또는 ㅂㅇㅅㅇㄹ)\nㅂ음성 인원 [숫자] (초성: ㅂㅇㅅ ㅇㅇ 또는 ㅂㅇㅅㅇㅇ) (0 = 제한없음)');
       }
     } catch (error) {
       console.error('음성채널 설정 변경 중 오류:', error);
