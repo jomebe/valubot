@@ -2097,7 +2097,7 @@ client.on('messageCreate', async (message) => {
 
       const imageAttachment = message.attachments.first();
       let requestBody = {
-        model: "thudm/glm-z1-32b:free",
+        model: "google/gemma-3-27b-it:free",
         max_tokens: 1000,
         temperature: 0.8,
         timeout: 30000
