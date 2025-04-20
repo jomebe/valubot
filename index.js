@@ -2097,7 +2097,7 @@ client.on('messageCreate', async (message) => {
 
       const imageAttachment = message.attachments.first();
       let requestBody = {
-        model: "google/gemini-2.0-flash-lite-preview-02-05:free",
+        model: "google/gemini-2.5-pro-exp-03-25:free",
         max_tokens: 1000,
         temperature: 0.8,
         timeout: 30000
