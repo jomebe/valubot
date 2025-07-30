@@ -1,42 +1,42 @@
 {
   "527822898174623759": {
-    "valorantName": "backspacebar",
     "puuid": "da377408-a716-55a4-8fbc-f8244ace24ed",
-    "updatedAt": "2025-02-17T14:48:02.204Z",
-    "discordTag": "rkdwlghks",
     "valorantTag": "123",
+    "region": "kr",
+    "discordTag": "rkdwlghks",
+    "valorantName": "backspacebar",
+    "updatedAt": "2025-02-17T14:48:02.204Z"
+  },
+  "900269171487698975": {
+    "discordTag": "duxck8",
+    "updatedAt": "2025-03-08T09:32:12.884Z",
+    "valorantTag": "duck1",
+    "valorantName": "Duxckシ",
+    "region": "kr",
+    "puuid": "7c99fa3a-416e-5a56-b536-908353b72788"
+  },
+  "820221944728780840": {
+    "valorantTag": "2262",
+    "discordTag": "jombee.c",
+    "puuid": "9286a72b-8721-5e0b-8ab2-05d63419f37e",
+    "updatedAt": "2025-02-15T03:13:00.154Z",
+    "valorantName": "dong",
     "region": "kr"
   },
   "685049730560294962": {
+    "discordTag": "herbsalt",
     "valorantTag": "rtg",
     "puuid": "140348ab-5033-5d20-b745-0f15f1ed6f2b",
     "valorantName": "준비갈완료",
-    "discordTag": "herbsalt",
     "updatedAt": "2025-02-17T16:47:16.062Z",
     "region": "kr"
   },
-  "820221944728780840": {
-    "puuid": "9286a72b-8721-5e0b-8ab2-05d63419f37e",
-    "region": "kr",
-    "discordTag": "jombee.c",
-    "valorantTag": "2262",
-    "updatedAt": "2025-02-15T03:13:00.154Z",
-    "valorantName": "dong"
-  },
-  "900269171487698975": {
-    "puuid": "7c99fa3a-416e-5a56-b536-908353b72788",
-    "updatedAt": "2025-03-08T09:32:12.884Z",
-    "valorantName": "Duxckシ",
-    "discordTag": "duxck8",
-    "valorantTag": "duck1",
-    "region": "kr"
-  },
   "597363370307354624": {
-    "puuid": "b02f0387-e8ab-52cb-b628-aee5c5ca0b36",
-    "updatedAt": "2025-02-15T03:54:57.488Z",
-    "valorantTag": "나문희",
-    "region": "kr",
     "discordTag": "iht_",
-    "valorantName": "빗살문희토기"
+    "region": "kr",
+    "valorantName": "빗살문희토기",
+    "puuid": "b02f0387-e8ab-52cb-b628-aee5c5ca0b36",
+    "valorantTag": "나문희",
+    "updatedAt": "2025-02-15T03:54:57.488Z"
   }
 }

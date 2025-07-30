@@ -3511,20 +3511,36 @@ async function processTTSQueue(guildId) {
 
 // Express 서버 설정 부분 수정
 const expressApp = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // 기본 라우트 추가
 expressApp.get('/', (req, res) => {
+  const now = new Date();
+  const koreanTime = now.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul'
+  });
+  
   res.json({
     status: 'online',
-    uptime: process.uptime(),
-    lastPing: new Date().toISOString()
+    message: 'VALUBOT이 정상 작동 중입니다! 🤖',
+    uptime: Math.floor(process.uptime()),
+    timestamp: koreanTime,
+    servers: client.guilds.cache.size,
+    users: client.users.cache.size,
+    memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
   });
+  
+  console.log(`🌐 [Health Check] 외부에서 상태 확인 - ${koreanTime}`);
 });
 
 // keep-alive 엔드포인트 추가
 expressApp.get('/keep-alive', (req, res) => {
-  res.json({ status: 'alive', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'alive', 
+    timestamp: new Date().toISOString(),
+    ping: 'pong'
+  });
+  console.log('🏓 Keep-alive 요청 받음');
 });
 
 // 서버 시작
@@ -3641,6 +3657,24 @@ client.once('ready', async () => {
       loadAttendanceData()
     ]);
     console.log('모든 데이터 로드 완료');
+
+    // 슬립 방지: 10분마다 활동 로그 출력
+    setInterval(() => {
+      const now = new Date();
+      const koreanTime = now.toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      console.log(`🤖 [Keep Alive] 봇 활성 상태 - ${koreanTime}`);
+      console.log(`📊 현재 서버 수: ${client.guilds.cache.size}`);
+      console.log(`👥 현재 사용자 수: ${client.users.cache.size}`);
+      console.log(`💾 메모리 사용량: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+    }, 10 * 60 * 1000); // 10분마다 실행
 
     // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
     client.guilds.cache.forEach(guild => {
@@ -3891,4 +3925,7 @@ async function playTTS(voiceChannel, text, username, language = 'ko') {
     throw error;
   }
 }
+
+// Discord 봇 로그인
+client.login(process.env.DISCORD_TOKEN);
 

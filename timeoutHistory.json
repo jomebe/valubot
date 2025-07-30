@@ -2,10 +2,10 @@
   "820221944728780840": {
     "timeouts": [
       {
+        "duration": 604799585,
         "timestamp": 1739453859808,
         "endTime": 1740058659393,
-        "reason": "미기재",
-        "duration": 604799585
+        "reason": "미기재"
       }
     ],
     "username": "jombee.c"
