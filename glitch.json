@@ -1,0 +1,28 @@
+{
+  "install": "npm install",
+  "start": "node index.js",
+  "watch": {
+    "ignore": [
+      "\\.git",
+      "node_modules",
+      "temp"
+    ],
+    "install": {
+      "include": [
+        "^package\\.json$",
+        "^\\.env$"
+      ]
+    },
+    "restart": {
+      "exclude": [
+        "^public/",
+        "^dist/"
+      ],
+      "include": [
+        "\\.js$",
+        "\\.json"
+      ]
+    },
+    "throttle": 900000
+  }
+}

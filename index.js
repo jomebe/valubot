@@ -3511,7 +3511,7 @@ async function processTTSQueue(guildId) {
 
 // Express 서버 설정 부분 수정
 const expressApp = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
 // 기본 라우트 추가
 expressApp.get('/', (req, res) => {
@@ -3560,7 +3560,7 @@ setInterval(async () => {
   } catch (error) {
     console.error('Keep-alive ping 실패:', error);
   }
-}, 10 * 60 * 1000); // 10분
+}, 4 * 60 * 1000); // 4분 (Glitch 슬립 방지)
 
 // Discord 봇 로그인
 client.login(process.env.DISCORD_TOKEN).catch(err => {
@@ -3674,7 +3674,7 @@ client.once('ready', async () => {
       console.log(`📊 현재 서버 수: ${client.guilds.cache.size}`);
       console.log(`👥 현재 사용자 수: ${client.users.cache.size}`);
       console.log(`💾 메모리 사용량: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
-    }, 10 * 60 * 1000); // 10분마다 실행
+    }, 4 * 60 * 1000); // 4분마다 실행 (Glitch 슬립 방지)
 
     // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
     client.guilds.cache.forEach(guild => {
