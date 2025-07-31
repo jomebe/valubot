@@ -3560,7 +3560,7 @@ setInterval(async () => {
   } catch (error) {
     console.error('Keep-alive ping 실패:', error);
   }
-}, 4 * 60 * 1000); // 4분 (Glitch 슬립 방지)
+}, 2 * 60 * 1000); // 2분 (Render 슬립 방지)
 
 // Discord 봇 로그인
 client.login(process.env.DISCORD_TOKEN).catch(err => {
