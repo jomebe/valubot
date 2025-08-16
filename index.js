@@ -2216,10 +2216,10 @@ client.on('messageCreate', async (message) => {
       return message.reply('이 명령어는 지정된 카테고리의 음성채널에서만 사용할 수 있습니다.');
     }
 
-    // 채널 관리 권한 확인
-    if (!memberVoiceChannel.permissionsFor(message.member).has(PermissionsBitField.Flags.ManageChannels)) {
-      return message.reply('채널 관리 권한이 없습니다.');
-    }
+    // 채널 관리 권한 확인 제거 - 모든 유저가 사용 가능하도록 변경
+    // if (!memberVoiceChannel.permissionsFor(message.member).has(PermissionsBitField.Flags.ManageChannels)) {
+    //   return message.reply('채널 관리 권한이 없습니다.');
+    // }
 
     try {
       if (subCommand === '이름' || subCommand === 'ㅇㄹ') {
