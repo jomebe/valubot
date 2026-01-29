@@ -2811,12 +2811,12 @@ function saveVoiceLog() {
   }
 }
 
-// 5분마다 로그 초기화
+// 30분마다 로그 초기화 (리소스 절약)
 setInterval(() => {
   voiceLogData = {};
   saveVoiceLog();
-  console.log('음성 로그가 초기화되었습니다.');
-}, 5 * 60 * 1000);
+  // console.log('음성 로그가 초기화되었습니다.'); // 로그 줄임
+}, 30 * 60 * 1000);
 
 
 
@@ -2985,11 +2985,11 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   // ... (나머지 코드)
 });
 
-// 5분마다 카운트 초기화
+// 30분마다 카운트 초기화 (리소스 절약)
 setInterval(() => {
   voiceCycleCounts = {};
-  console.log('음성 채널 입/퇴장 카운트가 초기화되었습니다.');
-}, RESET_INTERVAL);
+  // console.log('음성 채널 입/퇴장 카운트가 초기화되었습니다.'); // 로그 줄임
+}, 30 * 60 * 1000);
 
 // // 발로란트 전적 조회 함수
 // async function getPlayerStats(name, tag) {
@@ -3552,15 +3552,15 @@ expressApp.listen(PORT, '0.0.0.0', (err) => {
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다`);
 });
 
-// 10분마다 자동으로 keep-alive 요청 보내기
+// 10분마다 자동으로 keep-alive 요청 보내기 (리소스 절약)
 setInterval(async () => {
   try {
     const response = await axios.get(`${process.env.RENDER_EXTERNAL_URL}/keep-alive`);
-    console.log('Keep-alive ping 성공:', response.data);
+    // console.log('Keep-alive ping 성공:', response.data); // 로그 줄임
   } catch (error) {
-    console.error('Keep-alive ping 실패:', error);
+    // console.error('Keep-alive ping 실패:', error); // 로그 줄임
   }
-}, 2 * 60 * 1000); // 2분 (Render 슬립 방지)
+}, 10 * 60 * 1000); // 10분 (Render 슬립 방지, 리소스 절약)
 
 // Discord 봇 로그인
 client.login(process.env.DISCORD_TOKEN).catch(err => {
@@ -3658,23 +3658,16 @@ client.once('ready', async () => {
     ]);
     console.log('모든 데이터 로드 완료');
 
-    // 슬립 방지: 10분마다 활동 로그 출력
+    // 슬립 방지: 30분마다 활동 로그 출력 (리소스 절약)
     setInterval(() => {
       const now = new Date();
       const koreanTime = now.toLocaleString('ko-KR', {
         timeZone: 'Asia/Seoul',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
         hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+        minute: '2-digit'
       });
-      console.log(`🤖 [Keep Alive] 봇 활성 상태 - ${koreanTime}`);
-      console.log(`📊 현재 서버 수: ${client.guilds.cache.size}`);
-      console.log(`👥 현재 사용자 수: ${client.users.cache.size}`);
-      console.log(`💾 메모리 사용량: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
-    }, 4 * 60 * 1000); // 4분마다 실행 (Glitch 슬립 방지)
+      console.log(`🤖 [${koreanTime}] 서버:${client.guilds.cache.size} 유저:${client.users.cache.size} 메모리:${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+    }, 30 * 60 * 1000); // 30분마다 실행 (리소스 절약)
 
     // 모든 서버의 음성 채널을 확인하여 기존 참여자들의 시작 시간 설정
     client.guilds.cache.forEach(guild => {
@@ -3690,14 +3683,14 @@ client.once('ready', async () => {
       });
     });
 
-    // 1분마다 통화 시간 저장
+    // 5분마다 통화 시간 저장 (리소스 절약)
     setInterval(async () => {
       try {
         let updated = false;
         
         // 현재 통화 중인 모든 사용자의 시간 업데이트
         for (const [userId, startTime] of voiceStartTimes) {
-          const duration = 60000; // 1분
+          const duration = 5 * 60 * 1000; // 5분
           
           if (!userStats.voiceTime[userId]) {
             userStats.voiceTime[userId] = 0;
@@ -3712,15 +3705,15 @@ client.once('ready', async () => {
         // 변경된 내용이 있을 때만 저장
         if (updated) {
           await saveStats();
-          console.log('통화 시간 자동 저장 완료');
+          // console.log('통화 시간 자동 저장 완료'); // 로그 줄임
         }
       } catch (error) {
         console.error('통화 시간 자동 저장 중 오류:', error);
       }
-    }, 60000); // 1분마다 실행
+    }, 5 * 60 * 1000); // 5분마다 실행 (리소스 절약)
 
-    // 15분마다 temp 폴더 정리
-    setInterval(cleanupTempFolder, 15 * 60 * 1000);
+    // 1시간마다 temp 폴더 정리 (리소스 절약)
+    setInterval(cleanupTempFolder, 60 * 60 * 1000);
     
     // 시작할 때도 한 번 정리
     cleanupTempFolder();
